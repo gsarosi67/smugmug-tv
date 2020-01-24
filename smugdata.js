@@ -116,7 +116,7 @@ var smugdata = {
   statechangeevent : undefined,
   currentState : 'init',
   currentStateData : undefined,
-  currentUser : {},
+  currentUser : undefined,
   pageSize : 30,
   displaySize : {
      Width : 1280,
@@ -159,11 +159,8 @@ var smugdata = {
 
      smugdata.childrenFilterEncodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.childrenFilter).replace(/\s/g,''));
      smugdata.imagesFilterEncodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.imagesFilter).replace(/\s/g,''));
-
      smugdata.imageSizesFilterEncodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.imageSizesFilter).replace(/\s/g,''));
-
      smugdata.albumFilterEncodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.albumFilter).replace(/\s/g,''));
-
      smugdata.smugmugapi = smugdata.smugmugProtocol + smugdata.smug_api + smugdata.itemCount + smugdata.pageSize + smugdata.apiVerbosity + "&api=";
 
      if (smugdata.statechangeevent === undefined) {
@@ -183,6 +180,14 @@ var smugdata = {
      switch (smugdata.currentState) {
         case 'init':
            //getAuthUserInfo();
+           /* Init could be used a hard "reset" if memory needed to be released
+               - All data fetched from Smugmug is stored under the currentUser object
+               - currentStateData acts as a pointer to the current location in the content tree
+               - as more folders and albums are visited more data will accumulate in this tree
+               - if memory was needed resetting to init would orphan this data and the GC would remove it
+               - the impact to the user would be minimal, all data would need to be re-feteched from smugmug
+           */
+           smugdata.currentUser = new Object();
            smugdata.getUserContent(smugdata.smugmugapi + "user/"+smugdata.username,smugdata.currentUser,'getnodedata','unauthorized');
         break;
 
@@ -274,15 +279,15 @@ var smugdata = {
             smugdata.updateDisplayData(smugdata.currentStateData);
          break;
 
-         case 'getfoldernextpage':
+         case 'getfolderNextPage':
             smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.Children.Pages.NextPage.replace(/\?/g, "&") + smugdata.childrenFilterEncodedStr,smugdata.currentStateData.Children,'displaycontent','init');
          break;
 
-         case 'getfolderpreviouspage':
+         case 'getfolderPrevPage':
             smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.Children.Pages.PrevPage.replace(/\?/g, "&") + smugdata.childrenFilterEncodedStr,smugdata.currentStateData.Children,'displaycontent','init');
          break;
 
-         case 'getalbumnextpage':
+         case 'getalbumNextPage':
   	        /* Current paging model uses smugmug paging, so when the user moves to a new page or previous page
   	           I have to retrieve the data from Smugmug.  Not ideal.
   	             ToDo:  Implement separate data paging and screen paging
@@ -290,10 +295,10 @@ var smugdata = {
             smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.AlbumImages.Pages.NextPage.replace(/\?/g, "&") + smugdata.imagesFilterEncodedStr,smugdata.currentStateData.AlbumImages,'displaycontent','init');
          break;
 
-         case 'getalbumpreviouspage':
+         case 'getalbumPrevPage':
             smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.AlbumImages.Pages.PrevPage.replace(/\?/g, "&") + smugdata.imagesFilterEncodedStr,smugdata.currentStateData.AlbumImages,'displaycontent','init');
          break;
-  	}
+  	  }
   },
   updateDisplayData: function(Node) {
         var displayData = new Object();
@@ -354,8 +359,12 @@ var smugdata = {
            case "Folder" :
               displayData.type = "container";
               if (Node.Children && Node.Children.Pages) {
-                 displayData.previous = (Node.Children.Pages.PrevPage !== undefined);
-                 displayData.more = (Node.Children.Pages.NextPage !== undefined);
+                 if (Node.Children.Pages.PrevPage !== undefined) {
+                    displayData.previous = smugdata.getMoreData;
+                 }
+                 if (Node.Children.Pages.NextPage !== undefined) {
+                    displayData.more = smugdata.getMoreData;
+                 }
               }
               if (Node.Children && Node.Children.Node) {  /* could be an empty container */
                  Node.Children.Node.forEach(function (child,i) {
@@ -387,8 +396,12 @@ var smugdata = {
            case "AlbumImages" :
              displayData.type = "container";
              if (Node.AlbumImages && Node.AlbumImages.Pages) {
-                displayData.previous = (Node.AlbumImages.Pages.PrevPage !== undefined);
-                displayData.more = (Node.AlbumImages.Pages.NextPage !== undefined);
+                if (Node.AlbumImages.Pages.PrevPage !== undefined) {
+                   displayData.previous = smugdata.getMoreData;
+                }
+                if (Node.AlbumImages.Pages.NextPage !== undefined) {
+                   displayData.more = smugdata.getMoreData;
+                }
              }
              if (Node.AlbumImages && Node.AlbumImages.AlbumImage) {  /* could be an empty container */
                  Node.AlbumImages.AlbumImage.forEach(function (child,i) {
@@ -416,10 +429,12 @@ var smugdata = {
 
            case 'Media' :
               displayData.type = 'Media';
+              displayData.username = smugdata.currentUser.User.Name;
               displayData.format = Node.Format;
               displayData.parent = Node.Parent;  // Need to parent to get back to the container
               displayData.node = Node.Parent;  // ???
               displayData.filename = Node.FileName;
+              displayData.path = Node.FileName;
               displayData.title = Node.Title;
               displayData.action = smugdata.nodeAction;
               if (Node.IsVideo) {
@@ -594,6 +609,22 @@ var smugdata = {
             smugdata.debugLog("[smugdata.nodeAction] Unknown Type: " + node.Type);
          break;
   	   }
+   },
+   getMoreData : function(direction) {
+      if (direction == "PrevPage" || direction == "NextPage") {
+         if ( (smugdata.currentStateData.Type == "Folder") && (smugdata.currentStateData.Children.Pages[direction] != undefined) ) {
+            smugdata.currentState = 'getfolder' + direction;
+            document.dispatchEvent(smugdata.statechangeevent);
+         }
+         else if ( (smugdata.currentStateData.Type = "AlbumImages") && (smugdata.currentStateData.AlbumImages.Pages[direction] != undefined) ) {
+            smugdata.currentState = 'getalbum' + direction;
+            document.dispatchEvent(smugdata.statechangeevent);
+         }
+         else {
+	         /* don't do anything */
+            smugdata.debugLog("[smugdata.getMoreData] No " + direction);
+         }
+      }
    },
    adjustURL : function(stUrl) {
        if (smugdata.bProxy) {

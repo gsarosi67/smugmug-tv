@@ -23,7 +23,7 @@ var smugvue = new Vue({
       spinner : undefined,
       bDebug : true,
       scrolldirection : 'next',
-      pageSize : 30, /*  The max number of items to both fetch from Smugmug and to draw at one time. */
+      pageSize : 29, /*  The max number of items to both fetch from Smugmug and to draw at one time. */
       rowSize : 0,   /* number of items in one row, calculated at the end of the rendering */
       graphicsWidth : 1280,
       nonselectedColor : 'black',
@@ -86,7 +86,7 @@ var smugvue = new Vue({
             Vue.js reactivity system
              - this might be an issue on some TVs, what is the alternative??
          */
-         this.displayData = Object.assign({}, this.displayData, data)
+         this.displayData = Object.assign({}, data)
       },
       processCommandline : function(url) {
          var query = url.slice(url.indexOf("?")+1)

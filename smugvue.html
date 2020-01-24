@@ -16,19 +16,21 @@
       <div id="smugvue" class='screen'>
          <span id='ruler' class='ruler'></span>
          <div id='header' class='header'>
-            <div id='appname' class="appname">SmugMug for TV with Vue.js</div>
-            <div id='user' class="user" v-bind:style="usernameStyle()">{{ displayData.username }}</div>
+            <div id='appname' class="appname">SmugMug for TV</div>
+            <div id='user' class="user" v-bind:style="usernameStyle()">{{ displayData.username.toUpperCase() }}</div>
             <div id='path' class="path">{{ displayData.path }}</div>
          </div>
 
+
+         <div id='topinfo'  class='infoarea topinfo'>
+            <template v-if='displayData.previous'>
+               <input id="topmorebutton" class="morebutton" type="button" v-on:click="displayData.previous('PrevPage')" value="Show Previous...">
+            </template>
+         </div>
+
+
          <div id="contentsection" class="content">
             <template v-if="displayData.type === 'container'">
-               <template v-if='displayData.previous'>
-                   <div id='topinfo'  class='infoarea topinfo'>
-                       <input id="topmorebutton" class="morebutton" type="button" value="Show Previous...">
-                   </div>
-               </template>
-
                <div id="grid">
                   <div v-for="child in displayData.children" class="contententry">
                      <a href="javascript:void(0);" v-on:click="child.action()">
@@ -41,19 +43,13 @@
                      </a>
                   </div>
                </div>
-
-               <template v-if='displayData.more'>
-                  <div id='bottominfo'  class='infoarea bottominfo'>
-                     <input id="bottommorebutton" class="morebutton" type="button" value="Show More...">
-                  </div>
-               </template>
-           </template>
-           <template v-else-if="displayData.type === 'Media' && isImage(displayData.format)">
+            </template>
+            <template v-else-if="displayData.type === 'Media' && isImage(displayData.format)">
               <div id="imageplayerdiv" class="player" v-on:click="mediaended()">
                  <img class="playerimg" v-bind:src="displayData.url"></img>
               </div>
-           </template>
-           <template v-else-if="displayData.type === 'Media' && isVideo(displayData.format)">
+            </template>
+            <template v-else-if="displayData.type === 'Media' && isVideo(displayData.format)">
               <div id="videoplayer" class="player">
                  <div v-if="displayData.title !== undefined" class="vidtitle" id="vidname">
                      {{ displayData.title }}
@@ -63,15 +59,19 @@
                  </div>
                  <video class="playerimg" id="video" controls="true" autoplay v-on:ended="mediaended()" v-bind:src="displayData.url"></video>
               </div>
-           </template>
-           <template v-else>
+            </template>
+            <template v-else>
               <div class="vidtitle">
                  "Unknown Content Type"
               </div>
            </template>
          </div>
 
-
+         <div id='bottominfo'  class='infoarea bottominfo'>
+           <template v-if='displayData.more'>
+              <input id="bottommorebutton" class="morebutton" type="button" v-on:click="displayData.more('NextPage')" value="Show More...">
+           </template>
+         </div>
       </div>
    </body>
    <script type='text/javascript' src='smugnew.js?ver=2'></script>

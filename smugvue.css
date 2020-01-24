@@ -11,18 +11,15 @@ body {
 	overflow: hidden;
 }
 
-
 :focus {
   outline: 0;
 }
-
 /*  I want screen to represent the viewable area of the screen,
     the margin should represent the safe area on the TV.
 
     If I make the width and height 100% will it simply scale to the size
     of the browser window (or screen on a STB)?
 */
-
 
 .screen
 {
@@ -35,19 +32,21 @@ body {
 	 overflow: hidden;
 }
 
-
 .header {
   width: 100%;
   height: 9%;
+  /* background-color: rgb(142,166,190); */
   background-color: rgb(40,44,52);
   position: absolute;
   top: 0px;
   left: 0px;
   color: rgb(104,204,222);
+  /* color: rgb(30,30,30); */
+  /* border-radius: 10px; */
   font-family: Century Gothic, sans-serif;
   font-size: 24px;
 
-  visibility: hidden;
+  /* visibility: hidden; */
 }
 
 .appname {
@@ -99,13 +98,13 @@ body {
    color: white;
    font-size: 14px;
    z-index: 200;
-   visibility: hidden;
+   /* visibility: hidden; */
 }
 
 .morebutton {
    position: relative;
    top: 2%;
-
+   /* left: 38%; */
    left: 0;
    font-size: 16px;
 	border-style: none;
@@ -116,7 +115,7 @@ body {
    cursor: pointer;
 }
 
-.section {
+.content {
 	position: absolute;
    top: 12%;
    left: 0;
@@ -129,19 +128,30 @@ body {
 	overflow: scroll;
    opacity: 1;
 
-   visibility: hidden;
-
+   /* visibility: hidden; */
+    /*
+  	transition: transform 0.4s;
+  	transition-delay: 0.1s;
+  	-webkit-transition: transform 0.4s;
+  	-webkit-transition-delay: 0.1s;
+  	*/
 
 }
 
 .section.activeX {
   visibility: visible;
-
+  /*
+  transform: translateX(5%);
+  -webkit-transform: translateX(5%);
+  */
 }
 
 .section.activeY {
   visibility: visible;
-
+  /*
+  transform: translateY(60%);
+  -webkit-transform: translateY(60%);
+  */
 }
 
 .active {
@@ -172,7 +182,7 @@ body {
 	position: absolute;
 	left: 0px;
 	top: 0px;
-	visibility: hidden;
+
 	z-index: -100;
    box-sizing: border-box;
 }
@@ -199,7 +209,7 @@ body {
 	font-family: Verdana,sans-serif;
 	font-size: 95%;
 
-
+	/* animation: fadeout 5.0s; */
 }
 
 @keyframes fadeout {
@@ -222,10 +232,22 @@ body {
 
 .fullplayer
 {
+	/* position: fixed;
 
+	top: 50%;
+	left: 50%;
+	*/
 	top: 0;
 	left: 0;
+	/* min-width: 90%;
+    min-height: 90%; */
+	/* width: auto; */
+	/* height: 100%; */
 	z-index: -100;
+	/*
+	-webkit-transform: translateX(-50%) translateY(-50%);
+	transform: translateX(-50%) translateY(-50%); */
+
 	background-size: contain;
 }
 
@@ -233,6 +255,8 @@ body {
 {
 	position: relative;
 	float: left;
+	/*width: 250px;
+	height: 210px; */
    width: 233px;
 	height: 170px;
 	z-index: 100;
@@ -255,11 +279,23 @@ body {
 }
 
 .thumbimg {
+   /* object-fit: cover; */
    object-fit: cover;
    object-position: 50% 50%;
    width: 100%;
    height: 100%;
 }
+
+/*
+.contentlabel {
+	position: relative;
+	height: 10%;
+  	font-family: Century Gothic, sans-serif;
+  	font-size: 14px;
+    margin-top: 5px;
+    left: 0px;
+}
+*/
 
 .contentlabel {
 	position: absolute;

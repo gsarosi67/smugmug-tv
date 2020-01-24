@@ -323,13 +323,13 @@ function stateChange(event)
                      user.style.paddingRight = offset;
                   }
                }
-				  }
-          if (bExpandImage) {
-             getUserContent(smugmugapi + currentUser.User.Uris.Node + nodeExpand,currentUser,'getnodechildren','init');
-          }
-          else {
+				 }
+             if (bExpandImage) {
+                 getUserContent(smugmugapi + currentUser.User.Uris.Node + nodeExpand,currentUser,'getnodechildren','init');
+             }
+             else {
 				     getUserContent(smugmugapi + currentUser.User.Uris.Node,currentUser,'getnodechildren','init');
-          }
+             }
 			}
 			else {
 			    currentState = 'displaycontent';
@@ -447,12 +447,12 @@ function stateChange(event)
 
 		case 'getimageurl':
 			currentStateData.imagesizes = new Object();
-			getUserContent(smugmugapi + currentStateData.Uris.ImageSizes,currentStateData.imagesizes,'playimage','init');
+			getUserContent(smugmugapi + currentStateData.Uris.ImageSizes.replace(/\?/g, "&"),currentStateData.imagesizes,'playimage','init');
 		break;
 
 		case 'getvideourl':
 			currentStateData.largestvideo = new Object();
-			getUserContent(smugmugapi + currentStateData.Uris.LargestVideo,currentStateData.largestvideo,'playvideo','init');
+			getUserContent(smugmugapi + currentStateData.Uris.LargestVideo.replace(/\?/g, "&"),currentStateData.largestvideo,'playvideo','init');
 		break;
 
 		case 'displaycontent':
@@ -1032,13 +1032,13 @@ function displayContent(node)
 					nodeAction(containerid,parentnode,children,-1);
 			   },false);
 
-			    var thumbDiv = document.createElement("div");
-			    fileAnchor.appendChild(thumbDiv);
-			     thumbDiv.className="thumb";
+			   var thumbDiv = document.createElement("div");
+			   fileAnchor.appendChild(thumbDiv);
+			   thumbDiv.className="thumb";
 
 				var thumbImg = document.createElement("img");
 				thumbDiv.appendChild(thumbImg);
-              thumbImg.className="thumbimg";
+            thumbImg.className="thumbimg";
 
 				if (bExpandImage)
 				{
@@ -1063,15 +1063,14 @@ function displayContent(node)
 			        the data for the children of the parents parents....sigh
 					*/
 					var image;
-					if ( (parentnode != undefined) && (parentnode.IsRoot != undefined) )
-					{
-             if (!parentnode.IsRoot) {
-					      image = parentnode.Parent.Children.Expansions[parentnode.Uris.HighlightImage].Image;
-             }
-             else {
-                 /* feels like this should be in the parent node for the root, but its not */
-                image = currentUser.Expansions[parentnode.Uris.HighlightImage].Image;
-             }
+					if ( (parentnode != undefined) && (parentnode.IsRoot != undefined) ) {
+                  if (!parentnode.IsRoot) {
+                     image = parentnode.Parent.Children.Expansions[parentnode.Uris.HighlightImage].Image;
+                  }
+                  else {
+                     /* feels like this should be in the parent node for the root, but its not */
+                     image = currentUser.Expansions[parentnode.Uris.HighlightImage].Image;
+                  }
 					}
 
 					if (image != undefined)
@@ -1079,13 +1078,13 @@ function displayContent(node)
 						/* Based on the image original size, figure out the of the image is
 						   landscape or portrait, and center it in container */
 						//var wh = calcImageSize(thumbDiv,image.OriginalWidth,image.OriginalHeight);
-            if (!parentnode.IsRoot) {
-						   thumbImg.setAttribute("src",adjustURL(parentnode.Parent.Children.Expansions[image.Uris.ImageSizes].ImageSizes.SmallImageUrl));
-            }
-            else {
-               thumbImg.setAttribute("src",adjustURL(currentUser.Expansions[image.Uris.ImageSizes].ImageSizes.SmallImageUrl));
-            }
-            //thumbImg.setAttribute("width",wh.width);
+                  if (!parentnode.IsRoot) {
+                     thumbImg.setAttribute("src",adjustURL(parentnode.Parent.Children.Expansions[image.Uris.ImageSizes].ImageSizes.SmallImageUrl));
+                  }
+                  else {
+                     thumbImg.setAttribute("src",adjustURL(currentUser.Expansions[image.Uris.ImageSizes].ImageSizes.SmallImageUrl));
+                  }
+                  //thumbImg.setAttribute("width",wh.width);
 						//thumbImg.setAttribute("height",wh.height);
 						//thumbDiv.style.height=wh.height+"px";
 					}
@@ -1131,7 +1130,7 @@ function displayContent(node)
 		Not so fast....
 
 		Nodes can be Folders or Albums but Albums don't have children, they have an Album
-		object that we have to get the information for.  The Album object has and array of
+		object that we have to get the information for.  The Album object has an array of
 		Album Images...
 
 		Need to limit the number of items displayed at one time...
@@ -1152,8 +1151,7 @@ function displayContent(node)
 	{
 	    if (children[i].Type != "System Album")
 	    {
-			if (children[i].IsVideo)  /* will this work if this node is a folder??? */
-			{
+			if (children[i].IsVideo) { /* will this work if this node is a folder??? */
 				/* if the file is a video file, check to see if there is a
 				   video element and if not create it */
 				createVideoPlayer();
@@ -1227,8 +1225,7 @@ function displayContent(node)
 						   landscape or portrait */
 						var wh = calcImageSize(thumbDiv,children[i]);
 
-						getImageSizesUrls(children[i].Uris.ImageSizes,thumbDiv,'SmallImageUrl',
-										  wh.width,wh.height);
+						getImageSizesUrls(children[i].Uris.ImageSizes,thumbDiv,'SmallImageUrl',wh.width,wh.height);
 					}
 					else
 					{
@@ -1259,7 +1256,7 @@ function displayContent(node)
 		}
 	}
 
-   /* Determine is we need to draw get more buttons */
+   /* Determine if we need to draw get more buttons */
 	if ( ((currentStateData.Type == "Folder") && (currentStateData.Children.Pages.NextPage != undefined)) ||
         ((currentStateData.AlbumImages != undefined) && (currentStateData.AlbumImages.Pages.NextPage != undefined)) ) {
 

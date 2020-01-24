@@ -1,30 +1,16 @@
 
-var watch = {
-
-   displayData : function() {
-      /* Get the list of anchors to navigate
-         Not sure where to do this?
-         is there a better way?
-      */
-   	this.anchors = document.getElementsByTagName("a");
-   },
-   currentAnchor : function() {
-       this.changeFocus()
-   }
-}
-
 var smugvue = new Vue({
    el: '#smugvue',
    data : {
       displayData : {username: "sarosi", path: "/"},
       anchors : [],
-      currentAnchor : -1,
+      currentItem : -1,
       previousAnchor : -1,
       spinner : undefined,
       bDebug : true,
       scrolldirection : 'next',
       pageSize : 29, /*  The max number of items to both fetch from Smugmug and to draw at one time. */
-      rowSize : 0,   /* number of items in one row, calculated at the end of the rendering */
+      rowsize : 0,   /* number of items in one row, calculated at the end of the rendering */
       graphicsWidth : 1280,
       nonselectedColor : 'black',
       selectedColor : 'rgb(20,200,50)',
@@ -40,6 +26,17 @@ var smugvue = new Vue({
       videoFormats : ["MP4","MOV","OGG"],
       contentareaId : "contentsection",
       headerId : "header"
+   },
+   watch : {
+      displayData : function() {
+         /* Get the list of anchors to navigate */
+         var self=this;
+         this.printDbgMessage("displayData changed")
+         Vue.nextTick(function() {
+            self.anchors = document.getElementsByTagName("a")
+            self.rowsize = self.calcrowsize(self.anchors)
+        })
+      }
    },
    computed : {
 
@@ -80,12 +77,25 @@ var smugvue = new Vue({
             paddingRight: offset  + 'px'
          }
       },
+      selected : function(index) {
+         if (index === this.currentItem) {
+            return {
+               borderColor : this.selectedColor
+            }
+         }
+         else {
+            return {
+               borderColor : this.nonselectedColor
+            }
+         }
+      },
       updateDisplay : function(data) {
          /* ES6
             Object.assign is needed to create a new object which will trigger the
             Vue.js reactivity system
              - this might be an issue on some TVs, what is the alternative??
          */
+         this.currentItem = 0   /* not always */
          this.displayData = Object.assign({}, data)
       },
       processCommandline : function(url) {
@@ -179,8 +189,8 @@ var smugvue = new Vue({
         }
      },
      keyDown : function(event) {
-          var EKC = event.keyCode;
-          this.printDbgMessage("keyCode= " + EKC);
+        var EKC = event.keyCode;
+        this.printDbgMessage("keyCode= " + EKC);
 
          /* The browser on the Samsung TV does not pass the arrow keys (or much else)
             through to the application.   It does pass the number keys, so use these keys
@@ -188,124 +198,94 @@ var smugvue = new Vue({
             have a pointer but the navigation is a little awkward so also include these keys.
             Use the #7 button as a back button.
          */
-         var bHandled = false;
-         switch (EKC) {
-             case 48: /* 0 digit */
-                toggleDebug();
-                bHandled = true;
-             break;
+        var bHandled = false;
+        switch (EKC) {
+           case 48: /* 0 digit */
+                //toggleDebug();
+                //bHandled = true;
+           break;
 
-             case 55: /* 7 digit */
-             case 8: /* Xfinity Last Key / Keyboard backspace key */
-                //printDbgMessage("EKC: " + EKC + " Last key");
-                //if (!isActive('authinfo'))
-                if (currentState != 'authurldisplayed') {
-                /* Last key should go to previous directory or if playing video bring
-                   up content grid
-                   if (isActive(containerid)) {
-                     /* Grid is displayed, so go to the parent folder, if root do nothing
-                       - ToDo: if root display menu */
-                      //activateChild(gridid,parentdirid);
-                   //}
-                   //else {
-                         /* currentStateData is currently pointing to a AlbumImage (image or video)
-                            it needs to be set back to the containing Album */
-                       currentStateData = currentStateData.Parent;
-                       currentState = 'displaycontent';
-                       //toggleFilegrid();
-                       //gainFocusandScroll(anchors[currentAnchor]);
-                   //
-                   bHandled = true;
-                }
-             break;
-
-             case 57: /* 9 digit */
-             break;
-
-             case 52: /* 4 digit (left) */
-             case 37: /* Left arrow */
-             case 50: /* 2 digit (up) */
-             case 38: /* Up arrow */
-              /*
-                if (document.getElementById(gridid)) {
-                   var newAnchor;
-                   if (EKC == 37 || EKC == 52) {
-                      newAnchor = currentAnchor - 1;
-                   }
-                   else {
-                      newAnchor = currentAnchor - ROWSIZE;
-                   }
-                   if (newAnchor < 0) {
-                   /* SmugMug APIs automatically limit the response size.
-                      At this point we have reached the top of the current list of anchors so
-                      check to see if there are more and if there are, set the state to
-                      get the next page of content and redraw.
-                           ToDo option: don't destroy current list, just add to it (becareful of memory)
-                   */
-                     /*  ToDo:
-                         Need to figure out a way to allow navigable components in the header area.
-                         This will allow for a dropdown of user names, etc.
-                         this is a little squirrelly...don't like using the globals
-                       I want to be able to select the correct item when moving to the previous page (i.e. not the top)
-
-                   scrolldirection = 'previous';
-                   anchordelta = newAnchor;
-                     getPrevious();
-                }
-                else
-                {
-                   loseFocus(anchors[currentAnchor]);
-                   currentAnchor = newAnchor;
-                   gainFocusandScroll(anchors[currentAnchor]);
-                     if (!isActive(containerid)) {
-                       anchors[currentAnchor].click();
-                     }
-                }
-                bHandled = true;
+           case 55:      /* 7 digit */
+           case 8:       /* Xfinity Last Key / Keyboard backspace key */
+              if (this.displayData.children !== undefined) {
+                 if (this.displayData.parent !== null) {
+                    /* container that is not root, move to the previous container
+                        - the first child is always a link to the parent container
+                    */
+                    this.displayData.children[0].action()
+                 }
               }
-              */
+              else {
+                 /* children are undefined, so it must be a media item */
+                 this.displayData.action()
+              }
+              bHandled = true;
+           break;
+
+           case 57: /* 9 digit */
+           break;
+
+           case 52: /* 4 digit (left) */
+           case 37: /* Left arrow */
+           case 50: /* 2 digit (up) */
+           case 38: /* Up arrow */
+              if (this.displayData.type == "container") {
+                 var newItem;
+                 if (EKC == 37 || EKC == 52) {
+                    newItem = this.currentItem - 1;   /* 4 digit or left */
+                 }
+                 else {
+                    newItem = this.currentItem - this.rowsize;
+                 }
+
+                 if (newItem < 0) {
+                    if (this.displayData.previous !== undefined) {
+                       this.displayData.previous("PrevPage")
+                    }
+                    else {
+                       this.currentItem = 0
+                    }
+                 }
+                 else {
+                    this.currentItem = newItem;
+                    /* scroll */
+                 }
+                 bHandled = true;
+               }
              break;
 
              case 54: /* 6 digit (right) */
              case 39: /* Right arrow */
              case 56: /* 8 digit (down) */
-             case 40: /* Down arrow
-                 if (document.getElementById(gridid))
-                 {
-                var newAnchor;
-                if (EKC == 39 || EKC == 54)
-                {
-                   newAnchor = currentAnchor+1;
+             case 40: /* Down arrow */
+             if (this.displayData.type == "container") {
+                var newItem;
+                if (EKC == 39 || EKC == 54) {
+                   newItem = this.currentItem+1;      /* 6 digit or right */
                 }
-                else
-                {
-                   newAnchor = currentAnchor + ROWSIZE;
+                else {
+                   newItem = this.currentItem + this.rowsize;  /* 8 digit or down */
                 }
 
-                if (newAnchor >= anchors.length)
-                {
-                   /* Need to implement paging.  SmugMug APIs automatically limit the response
-                      size.
-
+                if (newItem >= this.anchors.length) {
+                   /*
                       At this point we have reached the end of the current list of anchors so
                       check to see if there are more and if there are, set the state to
-                      get the next page of content and redraw.
-
-                   scrolldirection = 'next';
-                   anchordelta = newAnchor - anchors.length;
-                     getNext();
+                      get the next page of content and redraw. */
+                   if (this.displayData.more !== undefined) {
+                      this.displayData.more('NextPage')
+                   }
+                   else {
+                      /* no more items make sure currentItem is at the end of the list */
+                      this.currentItem = this.anchors.length - 1
+                   }
                 }
-                else
-                {
-                   loseFocus(anchors[currentAnchor]);
-                   currentAnchor = newAnchor;
-                   gainFocusandScroll(anchors[currentAnchor]);
-                     if (!isActive(containerid)) {
-                       anchors[currentAnchor].click();
-                     }
+                else {
+                   this.currentItem = newItem;
+                   /* scroll */
                 }
                 bHandled = true;
-             } */
+             }
              break;
 
              case 51: /* 3 digit */
@@ -393,7 +373,31 @@ var smugvue = new Vue({
             //printDbgMessage("preventDefault");
             event.preventDefault();
          }
-      }
+      },
+      calcrowsize : function(anchors) {
+         var rows = new Array();
+         var rownum = 0;
+         var i = 0;
+
+         if (anchors !== undefined && anchors[0] !== undefined) {
+            var curY = anchors[0].getBoundingClientRect().top;
+            rows[0] = 0;
+            while (i < anchors.length) {
+      	      if (anchors[i].getBoundingClientRect().top > curY) {
+      		      rownum++;
+      		      rows[rownum] = 0;
+      		      curY = anchors[i].getBoundingClientRect().top;
+      	      }
+      	      rows[rownum]++;
+      	      i++;
+            }
+            return(rows[0])
+        }
+        else {
+           return 0;
+        }
+     }
   }
+
 
 })

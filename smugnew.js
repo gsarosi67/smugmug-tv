@@ -25,6 +25,7 @@ var smugvue = new Vue({
       imageFormats : ["JPG","JPEG","PNG","GIF","SVG","BMP"],
       videoFormats : ["MP4","MOV","OGG"],
       contentareaId : "contentsection",
+      ca : undefined,
       headerId : "header"
    },
    watch : {
@@ -50,7 +51,6 @@ var smugvue = new Vue({
 
       this.initData(smugdata)
 
-
       /* Is there a better way to do this in vue.js */
       //this.spinner = new Spinner({lines: 13, length: 30, width: 10, radius: 30, color: "#AAAAAA"});
 
@@ -65,8 +65,8 @@ var smugvue = new Vue({
    methods : {
       initData : function(dataSource) {
          if (dataSource) {
-            var ca = document.getElementById(this.contentareaId)
-            dataSource.init(this.updateDisplay, this.username, {debugLog: this.printDbgMessage, pageSize: this.pageSize, displaySize: {Width: ca.clientWidth, Height: ca.clientHeight}})
+            this.ca = document.getElementById(this.contentareaId)
+            dataSource.init(this.updateDisplay, this.username, {debugLog: this.printDbgMessage, pageSize: this.pageSize, displaySize: {Width: this.ca.clientWidth, Height: this.ca.clientHeight}})
          }
       },
       usernameStyle : function() {
@@ -188,6 +188,34 @@ var smugvue = new Vue({
            return 0
         }
      },
+     scroll : function (ele, container) {
+        /* this will be called on every navigation key press
+            - is this too heavy?
+            - is there a better way?
+        */
+        if (ele != undefined && container != undefined) {
+           var rect = ele.getBoundingClientRect();
+           var contrect = container.getBoundingClientRect();
+           var eleStyle = window.getComputedStyle(ele);
+
+           /* Check if we need to scroll the container */
+           if ((rect.bottom) > (window.innerHeight - parseInt(eleStyle.marginBottom))) {
+              this.printDbgMessage("Scroll Up: " + container.scrollTop);
+              /* not sure why I have this calculation, it ends up scrolling short
+                 why not just scroll the height of the current element?
+                 - seems to work...
+              */
+              //container.scrollTop += rect.bottom - (window.innerHeight - parseInt(eleStyle.marginBottom));
+              container.scrollTop += rect.height;
+              this.printDbgMessage("Scroll Top: " + container.scrollTop);
+           }
+           else if (rect.top < (contrect.top+parseInt(eleStyle.marginTop))) {
+              this.printDbgMessage("Scroll Down: " + container.scrollTop);
+              container.scrollTop -= (contrect.top+parseInt(eleStyle.marginTop)) - rect.top;
+              this.printDbgMessage("Scroll Top: " + container.scrollTop);
+           }
+        }
+     },
      keyDown : function(event) {
         var EKC = event.keyCode;
         this.printDbgMessage("keyCode= " + EKC);
@@ -247,8 +275,12 @@ var smugvue = new Vue({
                     }
                  }
                  else {
-                    this.currentItem = newItem;
+                    this.currentItem = newItem
                     /* scroll */
+                    var self=this
+                    Vue.nextTick(function() {
+                      self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+                   })
                  }
                  bHandled = true;
                }
@@ -283,6 +315,10 @@ var smugvue = new Vue({
                 else {
                    this.currentItem = newItem;
                    /* scroll */
+                   var self=this
+                   Vue.nextTick(function() {
+                      self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+                   })
                 }
                 bHandled = true;
              }
@@ -327,6 +363,13 @@ var smugvue = new Vue({
                to select the currenly highlighted anchor and to play/pause video */
              case 13: /* select */
              case 53: /* 5 digit */
+                if (this.displayData.type === "container") {
+                   this.displayData.children[this.currentItem].action()
+                }
+                else if (this.displayData.type === "Media" ) {
+                   this.mediaended()
+                }
+             break;
              case 32: /* space key */
              case 179: /* play/pause Xfinity
                   if (vid) {

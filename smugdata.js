@@ -370,11 +370,8 @@ var smugdata = {
                  Node.Children.Node.forEach(function (child,i) {
                     displayData.children[i+offset] = new Object();
                     displayData.children[i+offset].name = child.Name;
-                    displayData.children[i+offset].type = child.Type;
-                    /*  How do I center the Name???
-                       displayData.children[i].style
-                    */
-                    displayData.children[i+offset].action = smugdata.nodeAction;  /* really not sure about smugdata */
+                    displayData.children[i+offset].type = ((child.Type == "Folder" || child.Type == "Album") ? "container" : child.Type);
+                    displayData.children[i+offset].action = smugdata.nodeAction;
                     displayData.children[i+offset].node = child;
                     displayData.children[i+offset].parent = Node;
                     var image = Node.Children.Expansions[child.Uris.HighlightImage].Image

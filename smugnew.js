@@ -8,7 +8,6 @@ var smugvue = new Vue({
       previousAnchor : -1,
       spinner : undefined,
       bDebug : true,
-      scrolldirection : 'next',
       pageSize : 29, /*  The max number of items to both fetch from Smugmug and to draw at one time. */
       rowsize : 0,   /* number of items in one row, calculated at the end of the rendering */
       graphicsWidth : 1280,
@@ -26,7 +25,8 @@ var smugvue = new Vue({
       videoFormats : ["MP4","MOV","OGG"],
       contentareaId : "contentsection",
       ca : undefined,
-      headerId : "header"
+      headerId : "header",
+      direction : "NewPage"
    },
    watch : {
       displayData : function() {
@@ -36,6 +36,26 @@ var smugvue = new Vue({
          Vue.nextTick(function() {
             self.anchors = document.getElementsByTagName("a")
             self.rowsize = self.calcrowsize(self.anchors)
+            if (self.direction) {
+               switch (self.direction) {
+                  case 'PrevPage':
+                     self.currentItem = self.anchors.length - 1
+                  break;
+
+                  case 'NextPage':
+                  case 'NewPage':
+                     self.currentItem = 0;
+                  break;
+
+                  case 'MediaEnd':
+                  case 'PlayMedia':
+                     /* leave current item the same */
+                  break;
+               }
+            }
+            if (self.anchors && self.anchors.length > 0) {
+               self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+            }
         })
       }
    },
@@ -95,9 +115,8 @@ var smugvue = new Vue({
             Vue.js reactivity system
              - this might be an issue on some TVs, what is the alternative??
          */
-         this.currentItem = 0   /* not always */
          this.displayData = Object.assign({}, data)
-      },
+       },
       processCommandline : function(url) {
          var query = url.slice(url.indexOf("?")+1)
          if (query) {
@@ -135,8 +154,31 @@ var smugvue = new Vue({
          return false
       },
       mediaended : function(e) {
-         this.printDbgMessage("Media ended")
+         this.direction = "MediaEnd"
+         this.printDbgMessage(this.direction)
          this.displayData.action()
+      },
+      itemaction : function(item) {
+         if (item && item.action) {
+            if (item.type == "container") {
+               this.direction = "NewPage"
+            }
+            else {
+               this.direction = "PlayMedia"
+            }
+            this.printDbgMessage(this.direction)
+            item.action()
+         }
+      },
+      containermore : function(direction) {
+         this.direction = direction
+         this.printDbgMessage(direction)
+         if (direction === 'PrevPage') {
+            this.displayData.previous(direction)
+         }
+         else if (direction === 'NextPage') {
+            this.displayData.more(direction)
+         }
       },
       printDbgMessage : function(msg) {
          console.log(msg)
@@ -199,14 +241,10 @@ var smugvue = new Vue({
            var eleStyle = window.getComputedStyle(ele);
 
            /* Check if we need to scroll the container */
-           if ((rect.bottom) > (window.innerHeight - parseInt(eleStyle.marginBottom))) {
+           if ((rect.bottom) > (contrect.bottom - (parseInt(eleStyle.marginBottom) + parseInt(eleStyle.borderWidth)))) {
               this.printDbgMessage("Scroll Up: " + container.scrollTop);
-              /* not sure why I have this calculation, it ends up scrolling short
-                 why not just scroll the height of the current element?
-                 - seems to work...
-              */
-              //container.scrollTop += rect.bottom - (window.innerHeight - parseInt(eleStyle.marginBottom));
-              container.scrollTop += rect.height;
+               container.scrollTop += rect.bottom - (contrect.bottom - (parseInt(eleStyle.marginBottom) + parseInt(eleStyle.borderWidth)));
+              //container.scrollTop += rect.height;
               this.printDbgMessage("Scroll Top: " + container.scrollTop);
            }
            else if (rect.top < (contrect.top+parseInt(eleStyle.marginTop))) {
@@ -239,13 +277,18 @@ var smugvue = new Vue({
                  if (this.displayData.parent !== null) {
                     /* container that is not root, move to the previous container
                         - the first child is always a link to the parent container
+                        - ToDo: keep some additional context about each data node
+                          so that we can go back to the select item
+                          - For example if I select item 15 in a container and that opens
+                            another container, when I go back to the original container item
+                            15 should be selected.
                     */
-                    this.displayData.children[0].action()
+                    this.itemaction(this.displayData.children[0])
                  }
               }
               else {
                  /* children are undefined, so it must be a media item */
-                 this.displayData.action()
+                 this.mediaended()
               }
               bHandled = true;
            break;
@@ -253,6 +296,15 @@ var smugvue = new Vue({
            case 57: /* 9 digit */
            break;
 
+           case 13: /* select */
+           case 53: /* 5 digit */
+              if (this.displayData.type === "container") {
+                 this.itemaction(this.displayData.children[this.currentItem])
+              }
+              else if (this.displayData.type === "Media" ) {
+                 this.mediaended()
+              }
+           break;
            case 52: /* 4 digit (left) */
            case 37: /* Left arrow */
            case 50: /* 2 digit (up) */
@@ -278,9 +330,8 @@ var smugvue = new Vue({
                     this.currentItem = newItem
                     /* scroll */
                     var self=this
-                    Vue.nextTick(function() {
-                      self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
-                   })
+                    self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+
                  }
                  bHandled = true;
                }
@@ -316,9 +367,7 @@ var smugvue = new Vue({
                    this.currentItem = newItem;
                    /* scroll */
                    var self=this
-                   Vue.nextTick(function() {
-                      self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
-                   })
+                   self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
                 }
                 bHandled = true;
              }
@@ -359,17 +408,7 @@ var smugvue = new Vue({
                    } */
              break;
 
-            /* Overload the select key, the 5 digit, spacebar, and play/pause
-               to select the currenly highlighted anchor and to play/pause video */
-             case 13: /* select */
-             case 53: /* 5 digit */
-                if (this.displayData.type === "container") {
-                   this.displayData.children[this.currentItem].action()
-                }
-                else if (this.displayData.type === "Media" ) {
-                   this.mediaended()
-                }
-             break;
+
              case 32: /* space key */
              case 179: /* play/pause Xfinity
                   if (vid) {

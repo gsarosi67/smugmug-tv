@@ -26,7 +26,8 @@ var smugvue = new Vue({
       contentareaId : "contentsection",
       ca : undefined,
       headerId : "header",
-      direction : "NewPage"
+      direction : "NewPage",
+      videotagId : "video"
    },
    watch : {
       displayData : function() {
@@ -39,12 +40,22 @@ var smugvue = new Vue({
             if (self.direction) {
                switch (self.direction) {
                   case 'PrevPage':
-                     self.currentItem = self.anchors.length - 1
+                     if (self.anchors.length > 0) {
+                        self.currentItem = self.anchors.length - 1
+                     }
+                     else {
+                        self.currentItem = 0;
+                     }
                   break;
 
                   case 'NextPage':
                   case 'NewPage':
-                     self.currentItem = 0;
+                     if (self.anchors.length > 0) {
+                        self.currentItem = 1;
+                     }
+                     else {
+                        self.currentItem = 0;
+                     }
                   break;
 
                   case 'MediaEnd':
@@ -254,6 +265,45 @@ var smugvue = new Vue({
            }
         }
      },
+     playpause : function() {
+        this.printDbgMessage("play/pause");
+
+        var vid = document.getElementById(this.videotagId)
+        if (vid) {
+           if (vid.paused) {
+              this.printDbgMessage("video.paused true, calling play()");
+              vid.play();
+           }
+           else {
+              this.printDbgMessage("video.paused false, calling pause()");
+              vid.pause();
+           }
+        }
+     },
+     fastforward : function() {
+        /* lame version of video fast-forward, just jump ahead. Changing the
+           speed does not work on a lot of platforms */
+        var vid = document.getElementById(this.videotagId)
+        if (vid) {
+           if (vid.currentTime < (vid.duration - this.trickplay_incr)) {
+              vid.currentTime += this.trickplay_incr
+           }
+           else {
+              vid.currentTime = vid.duration
+           }
+        }
+     },
+     rewind : function() {
+        var vid = document.getElementById(this.videotagId)
+        if (vid) {
+           if (vid.currentTime > this.trickplay_incr) {
+               vid.currentTime -= this.trickplay_incr
+           }
+           else {
+               vid.currentTime = 0
+           }
+        }
+     },
      keyDown : function(event) {
         var EKC = event.keyCode;
         this.printDbgMessage("keyCode= " + EKC);
@@ -296,15 +346,24 @@ var smugvue = new Vue({
            case 57: /* 9 digit */
            break;
 
-           case 13: /* select */
+           case 13: /* select / return */
            case 53: /* 5 digit */
+           case 32: /* space key */
+           case 179: /* play/pause Xfinity */
               if (this.displayData.type === "container") {
                  this.itemaction(this.displayData.children[this.currentItem])
               }
-              else if (this.displayData.type === "Media" ) {
-                 this.mediaended()
+              else if (this.displayData.type === "Media") {
+                 if (this.isVideo(this.displayData.format)) {
+                    this.playpause()
+                 }
+                 else {
+                    this.mediaended()
+                 }
               }
+              bHandled = true;
            break;
+
            case 52: /* 4 digit (left) */
            case 37: /* Left arrow */
            case 50: /* 2 digit (up) */
@@ -375,52 +434,16 @@ var smugvue = new Vue({
 
              case 51: /* 3 digit */
              case 190: /* >/. key on keyboard */
-             case 228:  /* Forward Xfinity
-                   if (vid)
-                   {
-                      if (vid.currentTime < (vid.duration-trickplay_incr))
-                      {
-                         vid.currentTime += trickplay_incr;
-                      }
-                      else
-                      {
-                         vid.currentTime = vid.duration;
-                      }
-                      bHandled = true;
-                   }
-                   */
+             case 228:  /* Forward Xfinity */
+                this.fastforward()
+                bHandled = true
              break;
 
              case 49: /* 1 digit */
              case 188:  /* </, key on keyboard */
-             case 227:  /* Rewind Xfinity
-                  if (vid)
-                   {
-                      if (vid.currentTime > trickplay_incr)
-                      {
-                         vid.currentTime -= trickplay_incr;
-                      }
-                      else
-                      {
-                         vid.currentTime = 0;
-                      }
-                      bHandled = true;
-                   } */
-             break;
-
-
-             case 32: /* space key */
-             case 179: /* play/pause Xfinity
-                  if (vid) {
-                      playpause();
-                  }
-                  else {
-                     if (isActive(containerid)) {
-                       anchors[currentAnchor].click();
-                     }
-                  }
-                   bHandled = true;
-                   */
+             case 227:  /* Rewind Xfinity */
+                this.rewind()
+                bHandled = true;
              break;
 
              case 33: /* xfinity Page up */

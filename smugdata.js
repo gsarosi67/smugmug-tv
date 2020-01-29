@@ -464,7 +464,7 @@ var smugdata = {
 
         smugdata.displayDataCB(displayData);
   },
-  findImageSize(OriginalWidth, OriginalHeight, imageSizes, displaySize) {
+  findImageSize : function(OriginalWidth, OriginalHeight, imageSizes, displaySize) {
      /* Find the url to the image that best matches the display size
         - determine the image direction i.e. landscape or portrait based on
           which is greater width or height.
@@ -543,6 +543,129 @@ var smugdata = {
         smugdata.debugLog("Error: smApi or destObj not defined");
         smugdata.currentState = errorstate;
      }
+  },
+  getContent: function(targetnode) {
+
+    /*
+         New way to fetching content.  This is needed so that that display can fetch an
+         album of background images and get everything it needs (i.e. all urls) to randomly display
+         different images.
+
+         I will use fetch and a promise to call the correct apis, and not use the state model.
+
+         - The fetched data will be put under the node object, which should already be in the userdata tree
+         - The returned data (via Promise) will be in the displayData format
+
+         This could lead to a complete re-architecture of the smugdata.
+
+         for future use:
+	        By default, fetch won't send or receive any cookies from the server,
+	        resulting in unauthenticated requests if the site relies on maintaining
+           a user session (to send cookies, the credentials init option must be set).
+    */
+     return (new Promise(function(resolve, reject) {
+     if (targetnode) {
+        var node = new Object();
+        if (targetnode.Type == 'Album') {
+           /* getalbumdata
+              what if node.Album already exists?  */
+           fetch(smugdata.smugmugapi + targetnode.Uris.Album + smugdata.albumFilterEncodedStr).then(function(response) {
+              //smugdata.debugLog("getUserContent: response status = " + response.status + ":" + response.statusText);
+	           //smugdata.debugLog("getUserContent: response text = " + response.responseText);
+              if (response.ok) {
+                 return(response.json());
+              }
+              throw new Error(response.status)
+           }).then(function(respjson) {
+              for (var member in respjson.Response) {
+                 node[member] = respjson.Response[member];
+              }
+
+              if (respjson.Expansions != undefined) {
+                 node.Expansions = respjson.Expansions;
+              }
+
+              /* getalbumimages
+                  Figured out that using expansions correctly I can get all of the image
+                  urls when get the albumimages.  I need to change this everywhere, reduces
+                  the number of api calls and simplies the states.
+
+                  For now use it to get everything for this node.
+
+                  Not sure what is going to happen if I store this in the node...
+                    - don't store in node for now, use a temporary object
+
+                  ToDo: enlarge count for this call, or make it a parameter
+
+              */
+              node.Album.Parent = node.Parent;
+              node.Album.AlbumImages = new Object();
+              fetch(smugdata.smugmugapi + node.Album.Uris.AlbumImages + "&_expand=ImageSizeDetails").then(function(response) {
+                 if (response.ok) {
+                    return(response.json());
+                 }
+                 throw new Error(response.status)
+              }).then(function(images) {
+                 for (var member in images.Response) {
+                    node.Album.AlbumImages[member] = images.Response[member];
+                 }
+                 if (images.Expansions != undefined) {
+                    node.Album.AlbumImages.Expansions = images.Expansions;
+
+                    /* Now I have all the Image Urls and image details for all AlbumImages...*/
+                    var returnData = new Object();
+                    returnData.name = node.Album.Name;
+                    returnData.path = node.Album.UrlPath;
+                    returnData.imagecount = node.Album.ImageCount;
+                    returnData.children = [];
+                    node.Album.AlbumImages.AlbumImage.forEach(function (child,i) {
+                       returnData.children[i] = new Object();
+                       returnData.children[i].name = child.FileName;
+                       returnData.children[i].type = child.Format;
+                       returnData.children[i].action = smugdata.nodeAction;
+                       returnData.children[i].node = child;
+                       returnData.children[i].parent = node;
+                       /* what if SmallImage does not exist? */
+                       //returnData.children[i].thumbUrl = smugdata.adjustURL(node.Album.AlbumImages.Expansions[child.Uris.ImageSizes.Uri].ImageSizes.SmallImageUrl);
+
+                       /* I want to return all of the image sizes and image size details, but remove the smugmug specific
+                          size descriptions, i.e. Small, Medium, Large, etc.  */
+                       returnData.children[i].imagesizes = [];
+                       var sizes = node.Album.AlbumImages.Expansions[child.Uris.ImageSizeDetails].ImageSizeDetails;
+                       sizes.UsableSizes.forEach(function(size,index) {
+                          returnData.children[i].imagesizes[index] = sizes[size];
+                          returnData.children[i].imagesizes[index].Url = smugdata.adjustURL(returnData.children[i].imagesizes[index].Url);
+                       });
+                    });
+                    resolve(returnData);
+                 }
+                 else {
+                    /* if not expansions, then something went wrong */
+                    smugdata.debugLog("Error: No Expansions");
+                    reject("Error: No Expansions");
+                 }
+             });
+           }).catch(function(error) {
+              if (error == 401) {
+                 smugdata.debugLog("Not Authorized for SmugMug");
+                 reject("Not Authorized for SmugMug");
+              }
+              else {
+                 /* Error from SmugMug */
+                 smugdata.debugLog("Error connecting to SmugMug status: " + error);
+                 reject("Error connecting to SmugMug status: " + error);
+              }
+           });
+        }
+        else {
+           smugdata.debugLog("Not Album");
+           reject("Not Album");
+        }
+     }
+     else {
+        smugdata.debugLog("Error: targetnode not defined");
+        reject("Error: targetnode not defined")
+     }}));
   },
   nodeAction : function() {
       /* Key function that is called whenever a item is selected...

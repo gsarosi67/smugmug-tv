@@ -27,7 +27,11 @@ var smugvue = new Vue({
       ca : undefined,
       headerId : "header",
       direction : "NewPage",
-      videotagId : "video"
+      videotagId : "video",
+      screenId : "smugvue",
+      bkgContainerName : "Backgrounds",
+      bkgImages : undefined,
+      bkgUrl : undefined
    },
    watch : {
       displayData : function() {
@@ -100,6 +104,13 @@ var smugvue = new Vue({
             dataSource.init(this.updateDisplay, this.username, {debugLog: this.printDbgMessage, pageSize: this.pageSize, displaySize: {Width: this.ca.clientWidth, Height: this.ca.clientHeight}})
          }
       },
+      /*
+      screenbackStyle : function() {
+         if (this.bkgUrl) {
+            return ({backgroundImage: url()})
+         }
+      },
+      */
       usernameStyle : function() {
          var head = document.getElementById(this.headerId)
          var offset = ((head.clientWidth - this.visualLength(this.username.toUpperCase(),'userlist')) / 2)
@@ -127,7 +138,40 @@ var smugvue = new Vue({
              - this might be an issue on some TVs, what is the alternative??
          */
          this.displayData = Object.assign({}, data)
-       },
+
+         /* not sure if this the best place for this */
+         var self=this
+         if (this.bkgImages === undefined && this.displayData.parent == null && this.displayData.children) {
+             var bkgNode = this.displayData.children.find(function(ch) {
+                return (ch.name === self.bkgContainerName)
+             });
+             if (bkgNode !== undefined) {
+                smugdata.getContent(bkgNode.node).then(function(data) {
+                   self.bkgImages = data
+                   self.setbackgroundimage(self)
+                })
+                .catch(function(err) {
+                   self.printDbgMessage("Error getting backgroud images")
+                })
+             }
+         }
+         else {
+            /* Set the background image */
+            this.setbackgroundimage(this)
+         }
+      },
+      setbackgroundimage : function(self) {
+         if (self.bkgImages.children) {
+            var screendiv = document.getElementById(self.screenId)
+            if (screendiv) {
+               var index = self.getRandomInt(0,self.bkgImages.children.length-1)
+               self.bkgUrl = "url('" + self.findImageSize(self.bkgImages.children[index].node.OriginalWidth,
+                                    self.bkgImages.children[index].node.OriginalHeight,
+                                    self.bkgImages.children[index].imagesizes,
+                                    {Width: screendiv.clientWidth, Height: screendiv.clientHeight}) + "')"
+            }
+         }
+      },
       processCommandline : function(url) {
          var query = url.slice(url.indexOf("?")+1)
          if (query) {
@@ -190,6 +234,35 @@ var smugvue = new Vue({
          else if (direction === 'NextPage') {
             this.displayData.more(direction)
          }
+      },
+      getRandomInt: function(min, max) {
+         return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
+      },
+      findImageSize : function(OriginalWidth, OriginalHeight, imageSizes, displaySize) {
+         /* Find the url to the image that best matches the display size
+            - determine the image direction i.e. landscape or portrait based on
+              which is greater width or height.
+            - compare each image longer side with the display width or height do this,
+              in order from smallest to largest stop when you find an image
+              that is larger than the display or you run our of images
+            - assumes that imageSizes is sorted, smallest to largest
+         */
+         var dim;
+         if (displaySize && imageSizes) {
+            if (OriginalWidth >= OriginalHeight) {
+               dim = "Width";
+            }
+            else {
+               dim = "Height";
+            }
+            /* would like to use find, but might not be supported on TV */
+            for (var i = 0; i < imageSizes.length; i++) {
+                if (imageSizes[i][dim] > displaySize[dim]) {
+                  return imageSizes[i].Url;
+               }
+            }
+          }
+          return imageSizes[imageSizes.length-1].Url;
       },
       printDbgMessage : function(msg) {
          console.log(msg)

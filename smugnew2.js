@@ -26,6 +26,13 @@ var smugvue = new Vue({
          'cmac',
          'accionfotos'
       ],
+      defaultImageWidth : 233,
+      defaultImageHeight : 170,
+      imageMargin : 1,
+      imageborderWidth : 5,
+      imagePadding : 0,
+      imageWidth : 233,
+      imageHeight : 170,
       username : 'sarosi',
       trickplay_incr : 10,  /* fast-forward and rewind jump length in seconds */
       bRefresh : false, /* ??? */
@@ -94,13 +101,19 @@ var smugvue = new Vue({
       //document.addEventListener('statechange',this.stateChange)
       this.processCommandline(document.URL)
 
+      self.printDbgMessage("Screen Size: Width: " + document.getElementById(self.screenId).clientWidth + ", Height: " + document.getElementById(self.screenId).clientHeight)
       this.initData(smugdata)
 
       /* Is there a better way to do this in vue.js */
       //this.spinner = new Spinner({lines: 13, length: 30, width: 10, radius: 30, color: "#AAAAAA"});
       //self.calcImageSize(self)
       window.addEventListener('resize', _.debounce(function() {
-           //self.calcImageSize(self)
+          self.printDbgMessage("Screen Size: Width: " + document.getElementById(self.screenId).clientWidth + ", Height: " + document.getElementById(self.screenId).clientHeight)
+          if (self.displayData.children) {
+             self.calcImageSize(document.getElementById(self.screenId).clientWidth,
+                                document.getElementById(self.screenId).clientHeight,
+                                self.pageSize, self.displayData.children.length)
+          }
           self.initData(smugdata)
           self.$forceUpdate()
       },200), false)
@@ -109,8 +122,13 @@ var smugvue = new Vue({
    },
    methods : {
       initData : function(dataSource) {
+         var self=this;
          if (dataSource) {
-            dataSource.init(this.updateDisplay, this.username, {debugLog: this.printDbgMessage, pageSize: this.pageSize, displaySize: {Width: document.getElementById(this.screenId).clientWidth, Height: document.getElementById(this.screenId).clientHeight}})
+             dataSource.getUserNode(this.username, this.printDbgMessage).then(function(data) {
+                dataSource.getContent(data.node,self.pageSize).then(self.updateDisplay).catch(function(error) {
+                self.printDbgMessage(error)
+             })
+           });
          }
       },
       usernameStyle : function() {
@@ -131,15 +149,13 @@ var smugvue = new Vue({
          }
       },
       selected : function(index) {
-         if (index === this.currentItem) {
-            return {
-               borderColor : this.selectedColor
-            }
-         }
-         else {
-            return {
-               borderColor : this.nonselectedColor
-            }
+         return {
+            width : this.imageWidth + 'px',
+            height : this.imageHeight + 'px',
+            margin : this.imageMargin + 'px',
+            padding : this.imagePadding + 'px',
+            borderWidth : this.imageborderWidth + 'px',
+            borderColor : (index === this.currentItem ? this.selectedColor : this.nonselectedColor)
          }
       },
       updateDisplay : function(data) {
@@ -149,6 +165,12 @@ var smugvue = new Vue({
              - this might be an issue on some TVs, what is the alternative??
          */
          this.displayData = Object.assign({}, data)
+
+         if (this.displayData.children) {
+           this.calcImageSize(document.getElementById(this.screenId).clientWidth,
+                              document.getElementById(this.screenId).clientHeight,
+                              this.pageSize, this.displayData.children.length)
+         }
 
          /* not sure if this the best place for this */
          if (this.bkgContainerName !== undefined) {
@@ -224,18 +246,21 @@ var smugvue = new Vue({
       mediaended : function(e) {
          this.direction = "MediaEnd"
          this.printDbgMessage(this.direction)
-         this.displayData.action()
+         //this.displayData.action()
       },
       itemaction : function(item) {
-         if (item && item.action) {
-            if (item.type == "container") {
+         if (item) {
+            var self=this;
+            if (item.type == "Container") {
                this.direction = "NewPage"
             }
             else {
                this.direction = "PlayMedia"
             }
             this.printDbgMessage(this.direction)
-            item.action()
+            smugdata.getContent(item.node,self.pageSize).then(self.updateDisplay).catch(function(error) {
+                 self.printDbgMessage(error)
+            })
          }
       },
       containermore : function(direction) {
@@ -250,6 +275,28 @@ var smugvue = new Vue({
       },
       getRandomInt: function(min, max) {
          return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
+      },
+      calcImageSize : function(width, height, pagesize, imagecount) {
+        /* We will set a default image size and use that to determine the
+           number of columns.  The actual image size will be adjusted to fill the screen */
+
+        var totalImagewidth = this.defaultImageWidth + (2 * this.imageMargin) + (2 * this.imageborderWidth)
+        var columns = Math.floor(width / totalImagewidth)
+        columns = (columns < 1 ? 1 : columns)
+
+        this.imageWidth = Math.floor(width / columns) - (2 * this.imageMargin) - (2 * this.imageborderWidth)
+        /* to get imageHeight use the default image size aspect ratio */
+        this.imageHeight = Math.floor(parseFloat(this.imageWidth) * (this.defaultImageHeight / this.defaultImageWidth))
+
+         /* what if the number of images to display is less than the pagesize?  we should make the image
+            size larger to fill the screen */
+      },
+      contentEntryImage : function(entry) {
+         /* find the url to the image size that closest matches the calcuated image size for the current view.
+             - I am using the default image width and height as the orignal width and height, because that is only
+               used to determine which dimension to use for the Search
+         */
+         return this.findImageSize(this.defaultImageWidth, this.defaultImageHeight, entry.imagesizes, {Width: this.imageWidth, Height: this.imageHeight})
       },
       findImageSize : function(OriginalWidth, OriginalHeight, imageSizes, displaySize) {
          /* Find the url to the image that best matches the display size
@@ -447,7 +494,7 @@ var smugvue = new Vue({
 
            case 57: /* 9 digit */
               //if (document.fullscreenEnabled) {
-                if (this.displayData.type === "container") {
+                if (this.displayData.type === "Container") {
                    if (document.fullscreenElement == null)  {
                       this.openFullscreen(document.documentElement)
                    } else {
@@ -476,7 +523,7 @@ var smugvue = new Vue({
            case 53: /* 5 digit */
            case 32: /* space key */
            case 179: /* play/pause Xfinity */
-              if (this.displayData.type === "container") {
+              if (this.displayData.type === "Container") {
                  this.itemaction(this.displayData.children[this.currentItem])
               }
               else if (this.displayData.type === "Media") {
@@ -494,7 +541,7 @@ var smugvue = new Vue({
            case 37: /* Left arrow */
            case 50: /* 2 digit (up) */
            case 38: /* Up arrow */
-              if (this.displayData.type == "container") {
+              if (this.displayData.type == "Container") {
                  var newItem;
                  if (EKC == 37 || EKC == 52) {
                     newItem = this.currentItem - 1;   /* 4 digit or left */
@@ -526,7 +573,7 @@ var smugvue = new Vue({
              case 39: /* Right arrow */
              case 56: /* 8 digit (down) */
              case 40: /* Down arrow */
-             if (this.displayData.type == "container") {
+             if (this.displayData.type == "Container") {
                 var newItem;
                 if (EKC == 39 || EKC == 54) {
                    newItem = this.currentItem+1;      /* 6 digit or right */

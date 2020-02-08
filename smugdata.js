@@ -135,6 +135,11 @@ var smugdata = {
      }
   ],
   init : function(displayDataCB, username, options) {
+     if (options !== undefined) {
+       for (opt in options) {
+          smugdata[opt] = options[opt];
+       }
+     }
 
      if (displayDataCB === undefined) {
         smugdata.debugLog("[smugdata.init] Error display data callback is undefined");
@@ -143,6 +148,7 @@ var smugdata = {
      else {
         smugdata.displayDataCB = displayDataCB;
      }
+
      if (username === undefined) {
         smugdata.debugLog("[smugdata.init] Error display data callback is undefined");
         return false;
@@ -151,11 +157,7 @@ var smugdata = {
         smugdata.username = username;
      }
 
-     if (options !== undefined) {
-        for (opt in options) {
-           smugdata[opt] = options[opt];
-        }
-     }
+     smugdata.debugLog("[smugdata.init]: " + JSON.stringify(smugdata.displaySize));
 
      smugdata.childrenFilterEncodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.childrenFilter).replace(/\s/g,''));
      smugdata.imagesFilterEncodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.imagesFilter).replace(/\s/g,''));
@@ -474,6 +476,8 @@ var smugdata = {
         - to make sure I am comparing the image size in the correct order, I will
           use smugdata.imageSizesFilter.filteruri to determine the order to compare
      */
+     this.debugLog("[findImageSize] OW: " + OriginalWidth + " OH: " + OriginalHeight)
+     this.debugLog("[findImageSize] dw: " + displaySize.Width + " dh: " + displaySize.Height)
      var dim;
      if (displaySize && imageSizes && imageSizes.Expansions) {
         if (OriginalWidth >= OriginalHeight) {
@@ -486,6 +490,7 @@ var smugdata = {
         for (var i = 0; i < smugdata.imageSizesFilter.filteruri.length; i++) {
            var imgsize = smugdata.imageSizesFilter.filteruri[i];
            var uri = imageSizes.ImageSizes.Uris[imgsize];
+           this.debugLog("[findImageSize] dim: " + dim + " imageSize: " + imgsize + " size: (" + imageSizes.Expansions[uri][imgsize].Width + "," + imageSizes.Expansions[uri][imgsize].Height + ")");
            if ((imageSizes.Expansions[uri] && imageSizes.Expansions[uri][imgsize]) &&
                (imageSizes.Expansions[uri][imgsize][dim] > displaySize[dim])) {
               return imageSizes.Expansions[uri][imgsize].Url;

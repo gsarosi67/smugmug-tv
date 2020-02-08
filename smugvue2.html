@@ -7,7 +7,7 @@
       <script src="https://cdn.jsdelivr.net/npm/vue"></script> -->
       <script src='https://cdn.rawgit.com/github/fetch/v0.9.0/fetch.js'></script>
       <script src="https://cdn.jsdelivr.net/npm/lodash@4.13.1/lodash.min.js"></script>
-      <script type='text/javascript' src='smugdata.js?ver=2'></script>
+      <script type='text/javascript' src='smugdata2.js?ver=2'></script>
 
       <link rel="stylesheet" href="smugvue.css?ver=5">
    </head>
@@ -15,10 +15,10 @@
    <body>
       <div id="smugvue" class='screen' v-bind:style="{ backgroundImage: bkgUrl }">
          <span id='ruler' class='ruler'></span>
-       <template v-if="displayData.type === 'container'">
+       <template v-if="displayData.type === 'Container'">
          <div id='header' class='header'>
             <div id='appname' class="appname">SmugMug for TV</div>
-            <div id='user' class="user" v-bind:style="usernameStyle()">{{ displayData.username.toUpperCase() }}</div>
+            <div id='user' class="user" v-bind:style="usernameStyle()">{{ username.toUpperCase() }}</div>
             <div id='path' class="path">{{ displayData.path }}</div>
          </div>
 
@@ -34,7 +34,7 @@
                   <div v-for="(child,index) in displayData.children" class="contententry" v-bind:style="selected(index)">
                      <a href="javascript:void(0);" v-on:click="itemaction(child)">
                         <div class="thumb">
-                           <img class="thumbimg" v-bind:src="child.thumbUrl">
+                           <img class="thumbimg" v-bind:src="contentEntryImage(child)">
                         </div>
                         <div class="contentlabel">
                            {{ child.name }}
@@ -99,5 +99,5 @@
           <li class='infoentry'>No data available</li>
        </ul>
    </script>
-   <script type='text/javascript' src='smugnew.js?ver=2'></script>
+   <script type='text/javascript' src='smugnew2.js?ver=2'></script>
 </html>

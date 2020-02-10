@@ -8,6 +8,7 @@ var smugvue = new Vue({
    el: '#smugvue',
    data : {
       displayData : {username: "sarosi", path: "/"},
+      currentDisplayData : undefined,
       logScreen : {
          logs : []   /* this could get kind of big, how can we limit the size? */
       },
@@ -44,7 +45,6 @@ var smugvue = new Vue({
       direction : "NewPage",
       videotagId : "video",
       imagetagId : "image",
-      screenId : "smugvue",
       //bkgContainerName : "Backgrounds",
       bkgContainerName : undefined,  /* not that great of a look */
       bkgImages : undefined,
@@ -71,12 +71,14 @@ var smugvue = new Vue({
 
                   case 'NextPage':
                   case 'NewPage':
+                     /*
                      if (self.anchors.length > 0) {
                         self.currentItem = 1;
                      }
                      else {
+                     */
                         self.currentItem = 0;
-                     }
+                     //}
                   break;
 
                   case 'MediaEnd':
@@ -100,25 +102,23 @@ var smugvue = new Vue({
       document.addEventListener('keydown', this.keyDown, false)
       //document.addEventListener('statechange',this.stateChange)
       this.processCommandline(document.URL)
+      this.currentDisplayData = this.displayData
 
-      self.printDbgMessage("Screen Size: Width: " + document.getElementById(self.screenId).clientWidth + ", Height: " + document.getElementById(self.screenId).clientHeight)
+      self.printDbgMessage("Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
       this.initData(smugdata)
 
       /* Is there a better way to do this in vue.js */
       //this.spinner = new Spinner({lines: 13, length: 30, width: 10, radius: 30, color: "#AAAAAA"});
       //self.calcImageSize(self)
       window.addEventListener('resize', _.debounce(function() {
-          self.printDbgMessage("Screen Size: Width: " + document.getElementById(self.screenId).clientWidth + ", Height: " + document.getElementById(self.screenId).clientHeight)
+          self.printDbgMessage("Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
           if (self.displayData.children) {
-             self.calcImageSize(document.getElementById(self.screenId).clientWidth,
-                                document.getElementById(self.screenId).clientHeight,
+             self.calcImageSize(Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width),
+                                Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height),
                                 self.pageSize, self.displayData.children.length)
           }
-          self.initData(smugdata)
-          self.$forceUpdate()
+          //self.$forceUpdate()
       },200), false)
-
-      //document.dispatchEvent(statechangeevent)  The state machine should be in the dataSource
    },
    methods : {
       initData : function(dataSource) {
@@ -165,10 +165,11 @@ var smugvue = new Vue({
              - this might be an issue on some TVs, what is the alternative??
          */
          this.displayData = Object.assign({}, data)
+         this.currentDisplayData = this.displayData;
 
          if (this.displayData.children) {
-           this.calcImageSize(document.getElementById(this.screenId).clientWidth,
-                              document.getElementById(this.screenId).clientHeight,
+           this.calcImageSize(Math.floor(document.getElementById(this.screenId).getBoundingClientRect().width),
+                              Math.floor(document.getElementById(this.screenId).getBoundingClientRect().height),
                               this.pageSize, this.displayData.children.length)
          }
 
@@ -246,31 +247,40 @@ var smugvue = new Vue({
       mediaended : function(e) {
          this.direction = "MediaEnd"
          this.printDbgMessage(this.direction)
-         //this.displayData.action()
+         this.currentDisplayData = this.displayData
       },
       itemaction : function(item) {
          if (item) {
             var self=this;
             if (item.type == "Container") {
                this.direction = "NewPage"
+               smugdata.getContent(item.node,self.pageSize).then(self.updateDisplay).catch(function(error) {
+                    self.printDbgMessage(error)
+               })
             }
             else {
                this.direction = "PlayMedia"
+               this.currentDisplayData = item
             }
             this.printDbgMessage(this.direction)
-            smugdata.getContent(item.node,self.pageSize).then(self.updateDisplay).catch(function(error) {
-                 self.printDbgMessage(error)
-            })
          }
+      },
+      containerParent : function(node) {
+         var self=this
+         self.direction = "NewPage"   //should this be something else ??
+         smugdata.getContent(node,self.pageSize).then(self.updateDisplay).catch(function(error) {
+              self.printDbgMessage(error)
+         })
+         self.printDbgMessage(self.direction)
       },
       containermore : function(direction) {
          this.direction = direction
          this.printDbgMessage(direction)
          if (direction === 'PrevPage') {
-            this.displayData.previous(direction)
+            this.currentDisplayData.previous(direction)
          }
          else if (direction === 'NextPage') {
-            this.displayData.more(direction)
+            this.currentDisplayData.more(direction)
          }
       },
       getRandomInt: function(min, max) {
@@ -290,6 +300,23 @@ var smugvue = new Vue({
 
          /* what if the number of images to display is less than the pagesize?  we should make the image
             size larger to fill the screen */
+      },
+      displayImageUrl : function() {
+         /* find the url to the image size that closest matches the calcuated image size for the current view.
+         */
+         return this.findImageSize(this.currentDisplayData.originalwidth, this.currentDisplayData.originalheight, this.currentDisplayData.imagesizes,{
+                                      Width: Math.floor(document.getElementById(this.screenId).getBoundingClientRect().width),
+                                      Height: Math.floor(document.getElementById(this.screenId).getBoundingClientRect().height)
+                                   })
+      },
+      displayVideoUrl : function(entry) {
+         /* find the url to the image size that closest matches the calcuated image size for the current view.
+            - not sure what about this one, need to figure out the video formats supported
+         */
+         return this.findImageSize(this.currentDisplayData.originalwidth, this.currentDisplayData.originalheight, this.currentDisplayData.videosizes,{
+                                      Width: Math.floor(document.getElementById(this.screenId).getBoundingClientRect().width),
+                                      Height: Math.floor(document.getElementById(this.screenId).getBoundingClientRect().height)
+                                   })
       },
       contentEntryImage : function(entry) {
          /* find the url to the image size that closest matches the calcuated image size for the current view.
@@ -472,8 +499,8 @@ var smugvue = new Vue({
 
            case 55:      /* 7 digit */
            case 8:       /* Xfinity Last Key / Keyboard backspace key */
-              if (this.displayData.children !== undefined) {
-                 if (this.displayData.parent !== null) {
+              if (this.currentDisplayData.type === 'Container') {
+                 if (this.currentDisplayData.parent) {
                     /* container that is not root, move to the previous container
                         - the first child is always a link to the parent container
                         - ToDo: keep some additional context about each data node
@@ -482,11 +509,11 @@ var smugvue = new Vue({
                             another container, when I go back to the original container item
                             15 should be selected.
                     */
-                    this.itemaction(this.displayData.children[0])
+                    this.containerParent(this.currentDisplayData.parent)
                  }
               }
               else {
-                 /* children are undefined, so it must be a media item */
+                 /* must be a media item */
                  this.mediaended()
               }
               bHandled = true;
@@ -494,16 +521,16 @@ var smugvue = new Vue({
 
            case 57: /* 9 digit */
               //if (document.fullscreenEnabled) {
-                if (this.displayData.type === "Container") {
+                if (this.currentDisplayData.type === "Container") {
                    if (document.fullscreenElement == null)  {
                       this.openFullscreen(document.documentElement)
                    } else {
                       this.closeFullscreen()
                    }
                 }
-                else if (this.displayData.type === "Media") {
+                else if (this.currentDisplayData.type === "Media") {
                    if (document.fullscreenElement == null)  {
-                      if (this.isVideo(this.displayData.format)) {
+                      if (this.isVideo(this.currentDisplayData.format)) {
                          this.openFullscreen(document.getElementById(this.videotagId))
                       } else {
                          this.openFullscreen(document.getElementById(this.imagetagId))
@@ -523,11 +550,11 @@ var smugvue = new Vue({
            case 53: /* 5 digit */
            case 32: /* space key */
            case 179: /* play/pause Xfinity */
-              if (this.displayData.type === "Container") {
-                 this.itemaction(this.displayData.children[this.currentItem])
+              if (this.currentDisplayData.type === "Container") {
+                 this.itemaction(this.currentDisplayData.children[this.currentItem])
               }
-              else if (this.displayData.type === "Media") {
-                 if (this.isVideo(this.displayData.format)) {
+              else if (this.currentDisplayData.type === "Media") {
+                 if (this.isVideo(this.currentDisplayData.format)) {
                     this.playpause()
                  }
                  else {
@@ -541,7 +568,7 @@ var smugvue = new Vue({
            case 37: /* Left arrow */
            case 50: /* 2 digit (up) */
            case 38: /* Up arrow */
-              if (this.displayData.type == "Container") {
+              if (this.currentDisplayData.type == "Container") {
                  var newItem;
                  if (EKC == 37 || EKC == 52) {
                     newItem = this.currentItem - 1;   /* 4 digit or left */
@@ -551,8 +578,8 @@ var smugvue = new Vue({
                  }
 
                  if (newItem < 0) {
-                    if (this.displayData.previous !== undefined) {
-                       this.displayData.previous("PrevPage")
+                    if (this.currentDisplayData.previous !== undefined) {
+                       this.currentDisplayData.previous("PrevPage")
                     }
                     else {
                        this.currentItem = 0
@@ -573,7 +600,7 @@ var smugvue = new Vue({
              case 39: /* Right arrow */
              case 56: /* 8 digit (down) */
              case 40: /* Down arrow */
-             if (this.displayData.type == "Container") {
+             if (this.currentDisplayData.type == "Container") {
                 var newItem;
                 if (EKC == 39 || EKC == 54) {
                    newItem = this.currentItem+1;      /* 6 digit or right */
@@ -587,8 +614,8 @@ var smugvue = new Vue({
                       At this point we have reached the end of the current list of anchors so
                       check to see if there are more and if there are, set the state to
                       get the next page of content and redraw. */
-                   if (this.displayData.more !== undefined) {
-                      this.displayData.more('NextPage')
+                   if (this.currentDisplayData.more !== undefined) {
+                      this.currentDisplayData.more('NextPage')
                    }
                    else {
                       /* no more items make sure currentItem is at the end of the list */

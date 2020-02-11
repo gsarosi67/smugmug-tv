@@ -161,7 +161,7 @@ var smugdata = {
           }
        }));
   },
-  getContent: function(node,pageSize) {
+  getContent: function(node, pageSize, start) {
      /*
          New way to fetching content.
          I will use fetch and a promise to call the correct apis, and not use the state model.
@@ -177,8 +177,9 @@ var smugdata = {
         smugdata.smugmugapi = smugdata.smugmugProtocol + smugdata.smug_api + smugdata.apiVerbosity + "&api=";
         if (node) {
            if (node.Type === 'Album') {
-              if (node.Album === undefined) {
+              if (node.Album === undefined || node.Start !== start) {
                  smugdata.albumExpand.expand.AlbumImages.args.count = pageSize;
+                 smugdata.albumExpand.expand.AlbumImages.args.start = start;
                  var albumencodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.albumExpand));
                  fetch(smugdata.smugmugapi + node.Uris.Album.Uri + albumencodedStr).then(function(response) {
                     //smugdata.debugLog("getUserContent: response status = " + response.status + ":" + response.statusText);
@@ -194,6 +195,7 @@ var smugdata = {
                     }
                     if (respjson.Expansions != undefined) {
                        node.Expansions = respjson.Expansions;
+                       node.Start = node.Expansions[node.Album.Album.Uris.AlbumImages.Uri].Pages.Start;
                     }
 
                     var rd = smugdata.generateReturnData(node);
@@ -228,8 +230,8 @@ var smugdata = {
               }
            }
            else if (node.Type === 'Folder') {
-              if (node.Children === undefined) {
-                 var childrenencodedStr = "&count=" + pageSize + "&_config=" + encodeURI(JSON.stringify(smugdata.childrenExpand));
+              if (node.Children === undefined || node.Start !== start) {
+                 var childrenencodedStr = "&count=" + pageSize + "&start=" + start + "&_config=" + encodeURI(JSON.stringify(smugdata.childrenExpand));
                  fetch(smugdata.smugmugapi + node.Uris.ChildNodes.Uri + childrenencodedStr).then(function(response) {
                     //smugdata.debugLog("getUserContent: response status = " + response.status + ":" + response.statusText);
                     //smugdata.debugLog("getUserContent: response text = " + response.responseText);
@@ -241,6 +243,7 @@ var smugdata = {
                     if (respjson.Response.Node != undefined) {
                        node.Children = respjson.Response.Node;
                        node.Count = respjson.Response.Pages.Total;
+                       node.Start = respjson.Response.Pages.Start;
                     }
                     if (respjson.Expansions != undefined) {
                        node.Expansions = respjson.Expansions;
@@ -294,6 +297,7 @@ var smugdata = {
            returnData.path = node.Album.Album.UrlPath;
            returnData.type = "Container";
            returnData.count = node.Count;
+           returnData.start = node.Start;
            returnData.node = node;
            returnData.parent = node.Parent;
            returnData.children = [];
@@ -353,6 +357,7 @@ var smugdata = {
            returnData.path = node.UrlPath;
            returnData.type = "Container";
            returnData.count = node.Count;
+           returnData.start = node.Start;
            returnData.node = node;
            returnData.parent = node.Parent;  // fix this shit
            returnData.children = [];

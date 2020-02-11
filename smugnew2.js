@@ -17,7 +17,8 @@ var smugvue = new Vue({
       previousAnchor : -1,
       spinner : undefined,
       bDebug : true,
-      pageSize : 29, /*  The max number of items to both fetch from Smugmug and to draw at one time. */
+      pageSize : 50,
+      startNum : 1,
       rowsize : 0,   /* number of items in one row, calculated at the end of the rendering */
       graphicsWidth : 1280,
       nonselectedColor : 'black',
@@ -125,7 +126,8 @@ var smugvue = new Vue({
          var self=this;
          if (dataSource) {
              dataSource.getUserNode(this.username, this.printDbgMessage).then(function(data) {
-                dataSource.getContent(data.node,self.pageSize).then(self.updateDisplay).catch(function(error) {
+                self.startNum = 1
+                dataSource.getContent(data.node,self.pageSize,self.startNum).then(self.updateDisplay).catch(function(error) {
                 self.printDbgMessage(error)
              })
            });
@@ -166,6 +168,8 @@ var smugvue = new Vue({
          */
          this.displayData = Object.assign({}, data)
          this.currentDisplayData = this.displayData;
+
+         this.printDbgMessage("updateDisplay: Count: " + this.currentDisplayData.count + " Start: " + this.currentDisplayData.start)
 
          if (this.displayData.children) {
            this.calcImageSize(Math.floor(document.getElementById(this.screenId).getBoundingClientRect().width),
@@ -253,34 +257,55 @@ var smugvue = new Vue({
          if (item) {
             var self=this;
             if (item.type == "Container") {
-               this.direction = "NewPage"
-               smugdata.getContent(item.node,self.pageSize).then(self.updateDisplay).catch(function(error) {
+               self.direction = "NewPage"
+               self.startNum  = 1;
+               smugdata.getContent(item.node,self.pageSize,self.startNum).then(self.updateDisplay).catch(function(error) {
                     self.printDbgMessage(error)
                })
             }
             else {
-               this.direction = "PlayMedia"
-               this.currentDisplayData = item
+               self.direction = "PlayMedia"
+               self.currentDisplayData = item
             }
-            this.printDbgMessage(this.direction)
+            self.printDbgMessage(self.direction)
          }
       },
       containerParent : function(node) {
          var self=this
          self.direction = "NewPage"   //should this be something else ??
-         smugdata.getContent(node,self.pageSize).then(self.updateDisplay).catch(function(error) {
+         self.startNum = 1  //should be able to use this to return to the correct page
+         smugdata.getContent(node,self.pageSize,self.startNum).then(self.updateDisplay).catch(function(error) {
               self.printDbgMessage(error)
          })
          self.printDbgMessage(self.direction)
+      },
+      isMore : function() {
+         return ((this.currentDisplayData.start + this.pageSize) < this.currentDisplayData.count)
+      },
+      isPrev : function() {
+         return (this.currentDisplayData.start > 1)
       },
       containermore : function(direction) {
          this.direction = direction
          this.printDbgMessage(direction)
          if (direction === 'PrevPage') {
-            this.currentDisplayData.previous(direction)
+            if ( this.isPrev() ) {
+               this.startNum = this.currentDisplayData.start - this.pageSize
+               if (this.startNum < 0) this.startNum = 1
+               this.printDbgMessage("Fetching Prev: Count: " + this.currentDisplayData.count + " Start: " + this.startNum)
+               smugdata.getContent(this.currentDisplayData.node,this.pageSize,this.startNum).then(this.updateDisplay).catch(function(error) {
+                  this.printDbgMessage(error)
+               })
+            }
          }
          else if (direction === 'NextPage') {
-            this.currentDisplayData.more(direction)
+            if ( this.isMore() ) {
+               this.startNum = this.currentDisplayData.start + this.pageSize
+               this.printDbgMessage("Fetching More: Count: " + this.currentDisplayData.count + " Start: " + this.startNum)
+               smugdata.getContent(this.currentDisplayData.node,this.pageSize,this.startNum).then(this.updateDisplay).catch(function(error) {
+                  this.printDbgMessage(error)
+               })
+            }
          }
       },
       getRandomInt: function(min, max) {
@@ -578,8 +603,8 @@ var smugvue = new Vue({
                  }
 
                  if (newItem < 0) {
-                    if (this.currentDisplayData.previous !== undefined) {
-                       this.currentDisplayData.previous("PrevPage")
+                    if ( this.isPrev() ) {
+                       this.containermore("PrevPage")
                     }
                     else {
                        this.currentItem = 0
@@ -614,8 +639,8 @@ var smugvue = new Vue({
                       At this point we have reached the end of the current list of anchors so
                       check to see if there are more and if there are, set the state to
                       get the next page of content and redraw. */
-                   if (this.currentDisplayData.more !== undefined) {
-                      this.currentDisplayData.more('NextPage')
+                   if ( this.isMore() ) {
+                      this.containermore('NextPage')
                    }
                    else {
                       /* no more items make sure currentItem is at the end of the list */
@@ -691,7 +716,7 @@ var smugvue = new Vue({
                Vue.nextTick(function() {
                   /*  kinda hacky - auto scroll */
                   var logs = document.getElementById('logs')
-                  if (logs.scrollHeight > logs.clientHeight) {
+                  if (logs && (logs.scrollHeight > logs.clientHeight)) {
                      logs.scrollTop = logs.scrollHeight - logs.clientHeight
                   }
                })

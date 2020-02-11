@@ -23,7 +23,7 @@
          </div>
 
          <div id='topinfo'  class='infoarea topinfo'>
-            <template v-if='currentDisplayData.previous'>
+            <template v-if='isPrev()'>
                <input id="topmorebutton" class="morebutton" type="button" v-on:click="containermore('PrevPage')" value="Show Previous...">
             </template>
          </div>
@@ -46,7 +46,7 @@
          </div>
 
          <div id='bottominfo'  class='infoarea bottominfo'>
-           <template v-if='currentDisplayData.more'>
+           <template v-if='isMore()'>
               <input id="bottommorebutton" class="morebutton" type="button" v-on:click="containermore('NextPage')" value="Show More...">
            </template>
          </div>

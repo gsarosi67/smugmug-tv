@@ -304,46 +304,49 @@ var smugdata = {
 
            if (node.Expansions != undefined) {
               //node.Album.Album.Uris.AlbumImages.Uri   // this gives me the expansion key for AlbumImages
-              node.Expansions[node.Album.Album.Uris.AlbumImages.Uri].AlbumImage.forEach(function(child,i) {
-                 child.Parent = node;
-                 returnData.children[i] = new Object();
-                 returnData.children[i].name = child.FileName;
-                 returnData.children[i].type = child.Type = "Media"; // not sure this will work
-                 returnData.children[i].format = child.Format;
-                 returnData.children[i].node = child;
-                 returnData.children[i].parent = returnData;  // not sure I need this?
-                 returnData.children[i].path = child.FileName;
-                 returnData.children[i].originalwidth = child.OriginalWidth;
-                 returnData.children[i].originalheight = child.OriginalHeight;
-                 returnData.children[i].latitude = child.Latitude;
-                 returnData.children[i].longitude = child.Longitude;
-                 returnData.children[i].altitude = child.Altitude;
-                 returnData.children[i].date = child.Date;
+              if (node.Expansions[node.Album.Album.Uris.AlbumImages.Uri].AlbumImage) {
+                 /* AlbumImage will be undefined if Album is empty */
+                 node.Expansions[node.Album.Album.Uris.AlbumImages.Uri].AlbumImage.forEach(function(child,i) {
+                    child.Parent = node;
+                    returnData.children[i] = new Object();
+                    returnData.children[i].name = child.FileName;
+                    returnData.children[i].type = child.Type = "Media";
+                    returnData.children[i].format = child.Format;
+                    returnData.children[i].node = child;
+                    returnData.children[i].parent = returnData;  // not sure I need this?
+                    returnData.children[i].path = child.FileName;
+                    returnData.children[i].originalwidth = child.OriginalWidth;
+                    returnData.children[i].originalheight = child.OriginalHeight;
+                    returnData.children[i].latitude = child.Latitude;
+                    returnData.children[i].longitude = child.Longitude;
+                    returnData.children[i].altitude = child.Altitude;
+                    returnData.children[i].date = child.Date;
 
-                 /* I want to return all of the image sizes and image size details,
-                    but remove the smugmug specific
-                    size descriptions, i.e. Small, Medium, Large, etc.  */
-                 returnData.children[i].imagesizes = [];
-                 returnData.children[i].videosizes = [];
-                 var sizes = node.Expansions[child.Uris.ImageSizeDetails.Uri].ImageSizeDetails;
-                 var index = 0;
-                 var vindex = 0;
-                 sizes.UsableSizes.forEach(function(size) {
-                    if (size.includes("ImageSize")) {  //ES6
-                       returnData.children[i].imagesizes[index] = sizes[size];
-                       returnData.children[i].imagesizes[index].Url = smugdata.adjustURL(returnData.children[i].imagesizes[index].Url);
-                       index++;
-                    } else if (size.includes("VideoSize")) {
-                       returnData.children[i].videosizes[vindex] = sizes[size];
-                       returnData.children[i].videosizes[vindex].Url = smugdata.adjustURL(returnData.children[i].videosizes[vindex].Url);
-                       vindex++;
-                    }
+                    /* I want to return all of the image sizes and image size details,
+                       but remove the smugmug specific
+                       size descriptions, i.e. Small, Medium, Large, etc.  */
+                    returnData.children[i].imagesizes = [];
+                    returnData.children[i].videosizes = [];
+                    var sizes = node.Expansions[child.Uris.ImageSizeDetails.Uri].ImageSizeDetails;
+                    var index = 0;
+                    var vindex = 0;
+                    sizes.UsableSizes.forEach(function(size) {
+                       if (size.includes("ImageSize")) {  //ES6
+                          returnData.children[i].imagesizes[index] = sizes[size];
+                          returnData.children[i].imagesizes[index].Url = smugdata.adjustURL(returnData.children[i].imagesizes[index].Url);
+                          index++;
+                       } else if (size.includes("VideoSize")) {
+                          returnData.children[i].videosizes[vindex] = sizes[size];
+                          returnData.children[i].videosizes[vindex].Url = smugdata.adjustURL(returnData.children[i].videosizes[vindex].Url);
+                          vindex++;
+                       }
+                    });
+
+                    /* make sure sizes arrays are sorted smallest to largest */
+                    smugdata.sortSizes(returnData.children[i].imagesizes);
+                    smugdata.sortSizes(returnData.children[i].videosizes);
                  });
-
-                 /* make sure sizes arrays are sorted smallest to largest */
-                 smugdata.sortSizes(returnData.children[i].imagesizes);
-                 smugdata.sortSizes(returnData.children[i].videosizes);
-              });
+              }
               return({status: true, data: returnData});
            }
            else {
@@ -359,7 +362,7 @@ var smugdata = {
            returnData.count = node.Count;
            returnData.start = node.Start;
            returnData.node = node;
-           returnData.parent = node.Parent;  // fix this shit
+           returnData.parent = node.Parent;
            returnData.children = [];
 
            if (node.Children != undefined && node.Expansions != undefined) {
@@ -372,21 +375,24 @@ var smugdata = {
                  returnData.children[i].parent = returnData; // not sure I need this?
                  returnData.children[i].path = child.UrlPath;
                  var image = node.Expansions[child.Uris.HighlightImage.Uri].Image;
-                 returnData.children[i].highlightimagefilename = image.FileName;
-                 returnData.children[i].originalheight = image.OriginalHeight;
-                 returnData.children[i].originalwidth = image.OriginalWidth;
-                 var sizes = node.Expansions[image.Uris.ImageSizeDetails.Uri].ImageSizeDetails;
-                 returnData.children[i].imagesizes = [];
-                 var index = 0;
-                 sizes.UsableSizes.forEach(function(size) {
-                    if (size.includes("ImageSize")) {  //ES6
-                       returnData.children[i].imagesizes[index] = sizes[size];
-                       returnData.children[i].imagesizes[index].Url = smugdata.adjustURL(returnData.children[i].imagesizes[index].Url);
-                       index++;
-                    }
-                 });
-                 /* make sure imagesizes array is sorted smallest to largest */
-                 smugdata.sortSizes(returnData.children[i].imagesizes);
+                 /* if album or folder is empty the highlight image will be undefined */
+                 if (image) {
+                    returnData.children[i].highlightimagefilename = image.FileName;
+                    returnData.children[i].originalheight = image.OriginalHeight;
+                    returnData.children[i].originalwidth = image.OriginalWidth;
+                    var sizes = node.Expansions[image.Uris.ImageSizeDetails.Uri].ImageSizeDetails;
+                    returnData.children[i].imagesizes = [];
+                    var index = 0;
+                    sizes.UsableSizes.forEach(function(size) {
+                       if (size.includes("ImageSize")) {  //ES6
+                          returnData.children[i].imagesizes[index] = sizes[size];
+                          returnData.children[i].imagesizes[index].Url = smugdata.adjustURL(returnData.children[i].imagesizes[index].Url);
+                          index++;
+                       }
+                    });
+                    /* make sure imagesizes array is sorted smallest to largest */
+                    smugdata.sortSizes(returnData.children[i].imagesizes);
+                 }
               });
               return({status: true, data: returnData});
            }
@@ -416,22 +422,6 @@ var smugdata = {
         }
      });
   },
-  getMoreData : function(direction) {
-      if (direction == "PrevPage" || direction == "NextPage") {
-         if ( (smugdata.currentStateData.Type == "Folder") && (smugdata.currentStateData.Children.Pages[direction] != undefined) ) {
-            smugdata.currentState = 'getfolder' + direction;
-            document.dispatchEvent(smugdata.statechangeevent);
-         }
-         else if ( (smugdata.currentStateData.Type = "AlbumImages") && (smugdata.currentStateData.AlbumImages.Pages[direction] != undefined) ) {
-            smugdata.currentState = 'getalbum' + direction;
-            document.dispatchEvent(smugdata.statechangeevent);
-         }
-         else {
-	         /* don't do anything */
-            smugdata.debugLog("[smugdata.getMoreData] No " + direction);
-         }
-      }
-   },
    adjustURL : function(stUrl) {
        if (smugdata.bProxy) {
          /* get host from url */
@@ -445,6 +435,6 @@ var smugdata = {
             }
          }
        }
-       return stUrl;  /* if proxy is disabled or no match just return unmodified url */
+       return stUrl;  /* if proxy is disabled or no match, just return unmodified url */
    }
 }

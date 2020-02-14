@@ -101,16 +101,12 @@ var smugvue = new Vue({
       var self = this
       this.setErrorFunction()
       document.addEventListener('keydown', this.keyDown, false)
-      //document.addEventListener('statechange',this.stateChange)
       this.processCommandline(document.URL)
       this.currentDisplayData = this.displayData
 
       self.printDbgMessage("Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
       this.initData(smugdata)
 
-      /* Is there a better way to do this in vue.js */
-      //this.spinner = new Spinner({lines: 13, length: 30, width: 10, radius: 30, color: "#AAAAAA"});
-      //self.calcImageSize(self)
       window.addEventListener('resize', _.debounce(function() {
           self.printDbgMessage("Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
           if (self.displayData.children) {
@@ -118,7 +114,6 @@ var smugvue = new Vue({
                                 Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height),
                                 self.pageSize, self.displayData.children.length)
           }
-          //self.$forceUpdate()
       },200), false)
    },
    methods : {
@@ -348,7 +343,10 @@ var smugvue = new Vue({
              - I am using the default image width and height as the orignal width and height, because that is only
                used to determine which dimension to use for the Search
          */
-         return this.findImageSize(this.defaultImageWidth, this.defaultImageHeight, entry.imagesizes, {Width: this.imageWidth, Height: this.imageHeight})
+         if (entry.imagesizes) {
+            return this.findImageSize(this.defaultImageWidth, this.defaultImageHeight, entry.imagesizes, {Width: this.imageWidth, Height: this.imageHeight})
+         }
+         return undefined
       },
       findImageSize : function(OriginalWidth, OriginalHeight, imageSizes, displaySize) {
          /* Find the url to the image that best matches the display size
@@ -527,7 +525,6 @@ var smugvue = new Vue({
               if (this.currentDisplayData.type === 'Container') {
                  if (this.currentDisplayData.parent) {
                     /* container that is not root, move to the previous container
-                        - the first child is always a link to the parent container
                         - ToDo: keep some additional context about each data node
                           so that we can go back to the select item
                           - For example if I select item 15 in a container and that opens
@@ -545,8 +542,7 @@ var smugvue = new Vue({
            break;
 
            case 57: /* 9 digit */
-              //if (document.fullscreenEnabled) {
-                if (this.currentDisplayData.type === "Container") {
+               if (this.currentDisplayData.type === "Container") {
                    if (document.fullscreenElement == null)  {
                       this.openFullscreen(document.documentElement)
                    } else {
@@ -564,11 +560,6 @@ var smugvue = new Vue({
                       this.closeFullscreen()
                    }
                 }
-             /*
-             } else {
-                this.printDbgMessage("document Fullscreen not available")
-             }
-             */
            break;
 
            case 13: /* select / return */
@@ -748,6 +739,4 @@ var smugvue = new Vue({
         }
      }
   }
-
-
 })

@@ -1,6 +1,6 @@
 var smugdata = {
 
-	/******************************************************
+   /************************************************************************************************************
 	Time to create a seperate module to fetch and "deal" with retrieval of data
 	from the SmugMug APIs.
 
@@ -8,7 +8,35 @@ var smugdata = {
 	that is used by the view layer, so most likely would be a seperate filter module
 	that would call smugdata module to get the raw Smugmug data
 
-	*******************************************************/
+        2/1/2020
+        Rewrite the data layer.
+
+         I should be able to fetch all data using the following 3 calls and expansions:
+
+           /api/v2/user
+             "Node" : {
+               "expand" : {
+                  "ChildNodes" : {
+                     "expand" : {
+                        "HighlightImage" : {
+                           "expand" : {
+                              "ImageSizeDetails" : { }
+
+           /api/v2/children
+              "expand" : {
+                 "HighlightImage" : {
+                    "expand" : {
+                       "ImageSizeDetails" : { }
+
+           /api/v2/Album
+              "expand" : {
+                 "AlbumImages" : {
+                    "expand" : {
+                       "ImageSizeDetails" : { }
+
+        I should be able to do away with the state machine and just implement the calls.
+
+    **************************************************************************************************************/
 
 
 	/******* _expand option ******
@@ -23,105 +51,42 @@ var smugdata = {
 	   Expanded Object with each member name the Uris to the expanded API
 
 	*/
-  bExpandImage : true,
   bRefresh : false,
 
-  nodeExpand : "&_expand=HighlightImage.ImageSizes",
-  childrenExpand : "&_expand=HighlightImage.ImageSizes",
-  imagesExpand : "&_expand=ImageSizes",
-  bFilterApi : true,
-
-  childrenFilter : {
-	  filter: ["IsVideo","IsRoot","Name","Type","UrlPath"],
-	  filteruri: ["ChildNodes","HighlightImage","Album"],
-	  expand:{
-		  HighlightImage:{
-			  filter:["OriginalWidth","OriginalHeight"],
-			  filteruri:["ImageSizes"],
-			  expand:{
-			    ImageSizes:{
-				    filter:["SmallImageUrl","LargestImageUrl"],
-				    filteruri:[]
-			    }
-			  }
-		  }
-	  }
+  childrenExpand : {
+    expand:{
+       HighlightImage:{
+         expand:{
+            ImageSizeDetails:{ }
+         }
+       }
+    }
   },
-  //childrenFilterEncodedStr : "&_config=" + encodeURI(JSON.stringify(smugdata.childrenFilter).replace(/\s/g,'')),
-  childrenFilterEncodedStr : "",
-  imagesFilter : {
-	  filter: ["Date","Format","IsVideo","FileName","OriginalWidth","OriginalHeight","Title","UrlPath"],
-	  filteruri: ["ImageSizes","LargestVideo"],
-     expand: {
-        ImageSizes: {
-           filter: ["SmallImageUrl","LargestVideo","X2LargeImageUrl","LargestImageUrl"],
-           filteruri:[]
-        }
-     }
+  userExpand : {
+    expand : {
+      Node : { }
+    }
   },
-  imagesFilterEncodedStr : "",
-  imageSizesFilter: {
- 		     filter:["SmallImageUrl","MediumImageUrl","LargeImageUrl","XLargeImageUrl","X2LargeImageUrl","X3LargeImageUrl","X4LargeImageUrl","LargestImageUrl"],
-           /* important to keep this filteruri list in order smallest to largest, it is used in the search for an image size that best fits the content area */
-		     filteruri:["ImageSizeSmall","ImageSizeMedium","ImageSizeLarge","ImageSizeXLarge","ImageSizeX2Large","ImageSizeX3Large","ImageSizeX4Large","LargestImage"],
-           expand: {
-             ImageSizeSmall: {
-                filter: ["Ext","Width","Height","Size","Usable","Url"],
-                filteruri: []
-             },
-             ImageSizeMedium: {
-                filter: ["Ext","Width","Height","Size","Usable","Url"],
-                filteruri: []
-             },
-             ImageSizeLarge: {
-                filter: ["Ext","Width","Height","Size","Usable","Url"],
-                filteruri: []
-             },
-             ImageSizeXLarge: {
-                filter: ["Ext","Width","Height","Size","Usable","Url"],
-                filteruri: []
-             },
-             ImageSizeX2Large: {
-                filter: ["Ext","Width","Height","Size","Usable","Url"],
-                filteruri: []
-             },
-             ImageSizeX3Large: {
-                filter: ["Ext","Width","Height","Size","Usable","Url"],
-                filteruri: []
-             },
-             ImageSizeX4Large: {
-                filter: ["Ext","Width","Height","Size","Usable","Url"],
-                filteruri: []
-             },
-             LargestImage: {
-                filter: ["Ext","Width","Height","Size","Usable","Url"],
-                filteruri: []
-             },
-          }
-       },
-  imageSizesFilterEncodedStr : "",
-
-   albumFilter : {
-	  filter: ["ImageCount","Title","UrlPath","Name"],
-	  filteruri: ["HighlightImage","AlbumImages"]
+  albumExpand : {
+    expand : {
+      AlbumImages : {
+         args : {
+            count : 100
+         },
+         expand : {
+            ImageSizeDetails : { }
+         }
+      }
+    }
   },
-  //albumFilterEncodedStr : "&_config=" + encodeURI(JSON.stringify(smugdata.albumFilter).replace(/\s/g,'')),
-  albumFilterEncodedStr : "",
   itemCount : "?count=",
-  apiVerbosity : "&_verbosity=1",
+  apiVerbosity : "?_verbosity=3",
   smugmugProtocol : "https:",
   smug_api : "\//86w9cd1n98.execute-api.us-east-1.amazonaws.com/smugmug/",
   debugLog : function(msg) { console.log(msg); },
   displayData : undefined,
-  statechangeevent : undefined,
-  currentState : 'init',
-  currentStateData : undefined,
-  currentUser : undefined,
-  pageSize : 30,
-  displaySize : {
-     Width : 1280,
-     Height : 720
-  },
+  userData : undefined,
+  pageSize : 100,
 
   /* Proxy Configuration
      Used for IPv6 to IPv4 proxy */
@@ -134,623 +99,329 @@ var smugdata = {
         pathname: ""
      }
   ],
-  init : function(displayDataCB, username, options) {
-     if (options !== undefined) {
-       for (opt in options) {
-          smugdata[opt] = options[opt];
+  getUserNode: function(username, logger) {
+       /*
+           Fetch the user and the root node
+           - does not provide any content to display, except user info
+       */
+
+       if (logger) {
+          smugdata.debugLog = logger;
        }
-     }
 
-     if (displayDataCB === undefined) {
-        smugdata.debugLog("[smugdata.init] Error display data callback is undefined");
-        return false;
-     }
-     else {
-        smugdata.displayDataCB = displayDataCB;
-     }
+       return (new Promise(function(resolve, reject) {
+          smugdata.smugmugapi = smugdata.smugmugProtocol + smugdata.smug_api + smugdata.apiVerbosity + "&api=";
 
-     if (username === undefined) {
-        smugdata.debugLog("[smugdata.init] Error display data callback is undefined");
-        return false;
-     }
-     else {
-        smugdata.username = username;
-     }
-
-     smugdata.debugLog("[smugdata.init]: " + JSON.stringify(smugdata.displaySize));
-
-     smugdata.childrenFilterEncodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.childrenFilter).replace(/\s/g,''));
-     smugdata.imagesFilterEncodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.imagesFilter).replace(/\s/g,''));
-     smugdata.imageSizesFilterEncodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.imageSizesFilter).replace(/\s/g,''));
-     smugdata.albumFilterEncodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.albumFilter).replace(/\s/g,''));
-     smugdata.smugmugapi = smugdata.smugmugProtocol + smugdata.smug_api + smugdata.itemCount + smugdata.pageSize + smugdata.apiVerbosity + "&api=";
-
-     if (smugdata.statechangeevent === undefined) {
-        smugdata.statechangeevent = new Event('statechange');
-        document.addEventListener('statechange',smugdata.stateChange);
-     }
-     document.dispatchEvent(smugdata.statechangeevent);
-
-     return true;
-  },
-  stateChange : function (event) {
-     /* something is not right here.
-          probably has something to do with how I am creating smugdata...
-             - there is only one instance
-     */
-     smugdata.debugLog("stateChange: " + smugdata.currentState);
-     switch (smugdata.currentState) {
-        case 'init':
-           //getAuthUserInfo();
-           /* Init could be used a hard "reset" if memory needed to be released
-               - All data fetched from Smugmug is stored under the currentUser object
-               - currentStateData acts as a pointer to the current location in the content tree
-               - as more folders and albums are visited more data will accumulate in this tree
-               - if memory was needed resetting to init would orphan this data and the GC would remove it
-               - the impact to the user would be minimal, all data would need to be re-feteched from smugmug
-           */
-           smugdata.currentUser = new Object();
-           smugdata.getUserContent(smugdata.smugmugapi + "user/"+smugdata.username,smugdata.currentUser,'getnodedata','unauthorized');
-        break;
-
-        /* future
-        case 'unauthorized':
-           smugdata.authorizeUser();
-        break;
-
-        case 'submitAuthCode':
-           smugdata.submitCode();
-        break;
-        */
-
-        case 'getnodedata':  /* is this only for the Node of the root? */
-           if (smugdata.bRefresh || smugdata.currentUser.Node == undefined) {
-              smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentUser.User.Uris.Node + smugdata.nodeExpand,smugdata.currentUser,'getnodechildren','init');
-           }
-  			  else {
-              /* Already have the data, so no fetch, need to update the displayData */
-  			     smugdata.currentState = 'displaycontent';
-  			     smugdata.currentStateData = smugdata.currentUser.Node;
-  			     smugdata.updateDisplayData(smugdata.currentStateData);
-  			  }
-  		  break;
-
-        case 'getnodechildren': /* is this only for the Node of the root? */
-           smugdata.currentStateData = smugdata.currentUser.Node;
-           if (smugdata.bRefresh || smugdata.currentUser.Node.Children == undefined) {
-              smugdata.currentUser.Node.Children = new Object();
-              smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentUser.Node.Uris.ChildNodes + smugdata.childrenFilterEncodedStr,smugdata.currentUser.Node.Children,'displaycontent','init');
-           }
-           else {
-              smugdata.currentState = 'displaycontent';
-              smugdata.updateDisplayData(smugdata.currentStateData);
-           }
-        break;
-
-        case 'getchildren':
-           if (smugdata.bRefresh || smugdata.currentStateData.Children == undefined) {
-              smugdata.currentStateData.Children = new Object();
-              smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.Uris.ChildNodes + smugdata.childrenFilterEncodedStr,smugdata.currentStateData.Children,'displaycontent','init');
-           }
-           else {
-              smugdata.currentState = 'displaycontent';
-              //document.dispatchEvent(smugdata.statechangeevent);  can't do this here, because we are already in the event handler.  What is the "right" way to do this?
-              smugdata.updateDisplayData(smugdata.currentStateData);
-           }
-  		  break;
-
-        case 'getalbumdata':
-           if (smugdata.bRefresh || smugdata.currentStateData.Album == undefined) {
-              smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.Uris.Album + smugdata.albumFilterEncodedStr,smugdata.currentStateData,'getalbumimages','init');
-           }
-           else {
-              smugdata.currentState = 'displaycontent';
-              smugdata.currentStateData.Album.Parent = smugdata.currentStateData.Parent;
-              smugdata.currentStateData = smugdata.currentStateData.Album;
-              smugdata.updateDisplayData(smugdata.currentStateData);
-           }
-         break;
-
-         case 'getalbumimages':
-            if (smugdata.currentStateData.Type == 'Album') {
-               smugdata.currentStateData.Album.Parent = smugdata.currentStateData.Parent;
-               smugdata.currentStateData = smugdata.currentStateData.Album;
-            }
-
-            if (smugdata.bRefresh || smugdata.currentStateData.AlbumImages == undefined) {
-               smugdata.currentStateData.AlbumImages = new Object();
-               smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.Uris.AlbumImages + smugdata.imagesFilterEncodedStr,smugdata.currentStateData.AlbumImages,'displaycontent','init');
-            }
-            else {
-               smugdata.currentState = 'displaycontent';
-               smugdata.updateDisplayData(smugdata.currentStateData);
-            }
-         break;
-
-         case 'getimageurl':
-  			   smugdata.currentStateData.imagesizes = new Object();
-  			   smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.Uris.ImageSizes.replace(/\?/g, "&") + smugdata.imageSizesFilterEncodedStr,smugdata.currentStateData.imagesizes,'displaycontent','init');
-         break;
-
-         case 'getvideourl':
-            smugdata.currentStateData.largestvideo = new Object();
-            smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.Uris.LargestVideo.replace(/\?/g, "&"),smugdata.currentStateData.largestvideo,'displaycontent','init');
-         break;
-
-         case 'displaycontent':
-            smugdata.updateDisplayData(smugdata.currentStateData);
-         break;
-
-         case 'getfolderNextPage':
-            smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.Children.Pages.NextPage.replace(/\?/g, "&") + smugdata.childrenFilterEncodedStr,smugdata.currentStateData.Children,'displaycontent','init');
-         break;
-
-         case 'getfolderPrevPage':
-            smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.Children.Pages.PrevPage.replace(/\?/g, "&") + smugdata.childrenFilterEncodedStr,smugdata.currentStateData.Children,'displaycontent','init');
-         break;
-
-         case 'getalbumNextPage':
-  	        /* Current paging model uses smugmug paging, so when the user moves to a new page or previous page
-  	           I have to retrieve the data from Smugmug.  Not ideal.
-  	             ToDo:  Implement separate data paging and screen paging
-  	        */
-            smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.AlbumImages.Pages.NextPage.replace(/\?/g, "&") + smugdata.imagesFilterEncodedStr,smugdata.currentStateData.AlbumImages,'displaycontent','init');
-         break;
-
-         case 'getalbumPrevPage':
-            smugdata.getUserContent(smugdata.smugmugapi + smugdata.currentStateData.AlbumImages.Pages.PrevPage.replace(/\?/g, "&") + smugdata.imagesFilterEncodedStr,smugdata.currentStateData.AlbumImages,'displaycontent','init');
-         break;
-  	  }
-  },
-  updateDisplayData: function(Node) {
-        var displayData = new Object();
-
-        /* Node.Type only exists for folders, and Album nodes (which are called Albums), but not
-           for Albums, which is the actual container for AlbumImages */
-        if (Node.Type == undefined && Node.AlbumImages != undefined) {
-            Node.Type = "AlbumImages";
-        }
-        else if (Node.Type == undefined && Node.Format != undefined) {
-           Node.Type = "Media";  // not sure I like assuming media
-        }
-
-        if (Node.Type != "Media") {
-           var offset = 0;
-           displayData.username = smugdata.currentUser.User.Name;
-           displayData.path = Node.UrlPath;  /* ??? */
-           displayData.children = [];
-           if (Node.IsRoot) {
-              displayData.parent = null;
-           }
-           else {
-              displayData.parent = Node.Parent;
-              /* create link to parent container */
-              offset = 1;
-              displayData.children[0] = new Object();
-              displayData.children[0].name = "Parent Directory...";
-              displayData.children[0].type = Node.Parent.Type;
-              displayData.children[0].action = smugdata.nodeAction;
-              displayData.children[0].node = Node.Parent;
-              /* In this section I am getting the image for the parent node which means that it will
-                not be in the object pointed to by the expansion variable, that is the expansions (i.e. images) for the
-                current node.  So I have to go and find the parent's node expansions which is in
-                the data for the children of the parent's parent
-              */
-              var pimage;
-              if ( Node.Parent != undefined && Node.Parent.IsRoot != undefined) {
-                 if (!Node.Parent.IsRoot) {
-                    displayData.children[0].parent = Node.Parent.Parent;
-                    pimage = Node.Parent.Parent.Children.Expansions[Node.Parent.Uris.HighlightImage].Image;
-                 }
-                 else {
-                    pimage = smugdata.currentUser.Expansions[Node.Parent.Uris.HighlightImage].Image;
-                 }
-              }
-              if (pimage != undefined) {
-                 if (!Node.Parent.IsRoot) {
-                    displayData.children[0].thumbUrl = smugdata.adjustURL(Node.Parent.Parent.Children.Expansions[pimage.Uris.ImageSizes].ImageSizes.SmallImageUrl);
-                 }
-                 else {
-                    displayData.children[0].thumbUrl = smugdata.adjustURL(smugdata.currentUser.Expansions[pimage.Uris.ImageSizes].ImageSizes.SmallImageUrl);
-                 }
-              }
-           }
-        }
-
-        switch (Node.Type) {
-           case "Folder" :
-              displayData.type = "container";
-              if (Node.Children && Node.Children.Pages) {
-                 if (Node.Children.Pages.PrevPage !== undefined) {
-                    displayData.previous = smugdata.getMoreData;
-                 }
-                 if (Node.Children.Pages.NextPage !== undefined) {
-                    displayData.more = smugdata.getMoreData;
-                 }
-              }
-              if (Node.Children && Node.Children.Node) {  /* could be an empty container */
-                 Node.Children.Node.forEach(function (child,i) {
-                    displayData.children[i+offset] = new Object();
-                    displayData.children[i+offset].name = child.Name;
-                    displayData.children[i+offset].type = ((child.Type == "Folder" || child.Type == "Album") ? "container" : child.Type);
-                    displayData.children[i+offset].action = smugdata.nodeAction;
-                    displayData.children[i+offset].node = child;
-                    displayData.children[i+offset].parent = Node;
-                    var image = Node.Children.Expansions[child.Uris.HighlightImage].Image
-                    if (image != undefined) {  // it is possible for an empty folder or album to exist that would not have a highlight image
-                       if (Node.Children.Expansions[image.Uris.ImageSizes].ImageSizes.SmallImageUrl != undefined) {
-                          displayData.children[i+offset].thumbUrl = smugdata.adjustURL(Node.Children.Expansions[image.Uris.ImageSizes].ImageSizes.SmallImageUrl);
-                       }
-                       else {
-                          /* if the original image is smaller than SmallImageUrl, SmallImageUrl will not exist
-                             - I think that LargestImageUrl is always defined
-                          */
-                          displayData.children[i+offset].thumbUrl = smugdata.adjustURL(Node.Children.Expansions[image.Uris.ImageSizes].ImageSizes.LargestImageUrl);
-                       }
-                    }
-                 });
-              }
-           break;
-
-           case "AlbumImages" :
-             displayData.type = "container";
-             if (Node.AlbumImages && Node.AlbumImages.Pages) {
-                if (Node.AlbumImages.Pages.PrevPage !== undefined) {
-                   displayData.previous = smugdata.getMoreData;
+          if (username) {
+             var userencodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.userExpand));
+             fetch(smugdata.smugmugapi + "user/" + username + userencodedStr).then(function(response) {
+                //smugdata.debugLog("getUserContent: response status = " + response.status + ":" + response.statusText);
+                //smugdata.debugLog("getUserContent: response text = " + response.responseText);
+                if (response.ok) {
+                   return(response.json());
                 }
-                if (Node.AlbumImages.Pages.NextPage !== undefined) {
-                   displayData.more = smugdata.getMoreData;
+                throw new Error(response.status)
+             }).then(function(respjson) {
+                if (respjson.Response != undefined) {
+                   smugdata.userData = respjson.Response.User;
+
+                   if (respjson.Expansions !== undefined) {
+                      smugdata.userData.rootnode = respjson.Expansions[smugdata.userData.Uris.Node.Uri].Node;
+                      smugdata.userData.rootnode.Parent = undefined;
+
+                      var returnData = new Object();
+                      returnData.name = smugdata.userData.Name;
+                      returnData.node = smugdata.userData.rootnode;
+                      returnData.parent = null;
+                      returnData.type = "Root";
+                      returnData.path = smugdata.userData.rootnode.UrlPath;
+
+                      resolve(returnData);
+                   }
                 }
-             }
-             if (Node.AlbumImages && Node.AlbumImages.AlbumImage) {  /* could be an empty container */
-                 Node.AlbumImages.AlbumImage.forEach(function (child,i) {
-                    displayData.children[i+offset] = new Object();
-                    displayData.children[i+offset].name = child.FileName;
-                    displayData.children[i+offset].type = child.Format;
-                    /*  How do I center the Name???
-                       displayData.children[i].style
-                    */
-                    displayData.children[i+offset].action = smugdata.nodeAction;  /* really not sure about smugdata */
-                    displayData.children[i+offset].node = child;
-                    displayData.children[i+offset].parent = Node;
-                    if (Node.AlbumImages.Expansions[child.Uris.ImageSizes].ImageSizes.SmallImageUrl != undefined) {
-                       displayData.children[i+offset].thumbUrl = smugdata.adjustURL(Node.AlbumImages.Expansions[child.Uris.ImageSizes].ImageSizes.SmallImageUrl);
-                    }
-                    else {
-                       /* if the original image is smaller than SmallImageUrl, SmallImageUrl will not exist
-                          - I think that LargestImageUrl is always defined
-                       */
-                       displayData.children[i+offset].thumbUrl = smugdata.adjustURL(Node.AlbumImages.Expansions[child.Uris.ImageSizes].ImageSizes.LargestImageUrl);
-                    }
-                 });
-             }
-           break;
-
-           case 'Media' :
-              displayData.type = 'Media';
-              displayData.username = smugdata.currentUser.User.Name;
-              displayData.format = Node.Format;
-              displayData.parent = Node.Parent;  // Need to parent to get back to the container
-              displayData.node = Node.Parent;  // this gets us back on a nodeAction
-              displayData.filename = Node.FileName;
-              displayData.path = Node.FileName;
-              displayData.title = Node.Title;
-              displayData.action = smugdata.nodeAction;
-              if (Node.IsVideo) {
-                    displayData.url = smugdata.adjustURL(Node.largestvideo.LargestVideo.Url);
-                    displayData.width = Node.OriginalWidth;
-                    displayData.height = Node.OriginalHeight;
-              }
-              else {
-                    /* Smugmug provides multiple image sizes we want to user the largest available image
-                       that fits on the display.
-                         - The Largest Image is probably too large and a waste of memory.
-                         - Since this is supposed to be the data module, I don't like having to worry about
-                           display size.
-                         - I could provide the desired view size when initialzing this module, but what
-                           is the size changes?  Probably won't happen on a TV, but could on laptop.
-
-                    */
-                    //displayData.url = smugdata.adjustURL(Node.imagesizes.ImageSizes.LargestImageUrl);
-                    displayData.url = smugdata.adjustURL(smugdata.findImageSize(Node.OriginalWidth,Node.OriginalHeight,Node.imagesizes,smugdata.displaySize));
-                    displayData.width = Node.OriginalWidth;
-                    displayData.height = Node.OriginalHeight;
-              }
-           break;
-
-           default:
-               /* not sure what do to.  Should I use smugdata for displaying content?? */
-               smugdata.debugLog("Unknown type: " + Node.Type);
-           break;
-        }
-
-        smugdata.displayDataCB(displayData);
+                else {
+                   smugdata.debugLog("Response undefined");
+                   reject("Response undefined");
+                }
+             }).catch(function(error) {
+                if (error == 401) {
+                   smugdata.debugLog("Not Authorized for SmugMug");
+                   reject("Not Authorized for SmugMug");
+                }
+                else {
+                   /* Error from SmugMug */
+                   smugdata.debugLog("Error connecting to SmugMug status: " + error);
+                   reject("Error connecting to SmugMug status: " + error);
+                }
+             });
+          }
+          else {
+             smugdata.debugLog("Error username undefined");
+             reject("Error username undefined");
+          }
+       }));
   },
-  findImageSize : function(OriginalWidth, OriginalHeight, imageSizes, displaySize) {
-     /* Find the url to the image that best matches the display size
-        - determine the image direction i.e. landscape or portrait based on
-          which is greater width or height.
-        - compare each image longer side with the display width or height do this,
-          in order from smallest to largest stop when you find an image
-          that is larger than the display or you run our of images
-        - to make sure I am comparing the image size in the correct order, I will
-          use smugdata.imageSizesFilter.filteruri to determine the order to compare
-     */
-     this.debugLog("[findImageSize] OW: " + OriginalWidth + " OH: " + OriginalHeight)
-     this.debugLog("[findImageSize] dw: " + displaySize.Width + " dh: " + displaySize.Height)
-     var dim;
-     if (displaySize && imageSizes && imageSizes.Expansions) {
-        if (OriginalWidth >= OriginalHeight) {
-           dim = "Width";
-        }
-        else {
-           dim = "Height";
-        }
-        /* would like to use find, but might not be supported on TV */
-        for (var i = 0; i < smugdata.imageSizesFilter.filteruri.length; i++) {
-           var imgsize = smugdata.imageSizesFilter.filteruri[i];
-           var uri = imageSizes.ImageSizes.Uris[imgsize];
-           this.debugLog("[findImageSize] dim: " + dim + " imageSize: " + imgsize + " size: (" + imageSizes.Expansions[uri][imgsize].Width + "," + imageSizes.Expansions[uri][imgsize].Height + ")");
-           if ((imageSizes.Expansions[uri] && imageSizes.Expansions[uri][imgsize]) &&
-               (imageSizes.Expansions[uri][imgsize][dim] > displaySize[dim])) {
-              return imageSizes.Expansions[uri][imgsize].Url;
-           }
-        }
-      }
-      /* default, assume there is always a largest image */
-      return imageSizes.Expansions[imageSizes.ImageSizes.Uris.LargestImage].LargestImage.Url;
-  },
-  getUserContent: function(smApi, destObj, state, errorstate) {
-
-    /*
-         for future use:
-	        By default, fetch won't send or receive any cookies from the server,
-	        resulting in unauthenticated requests if the site relies on maintaining
-           a user session (to send cookies, the credentials init option must be set).
-    */
-
-     if (smApi) {
-        fetch(smApi).then(function(response) {
-           //smugdata.debugLog("getUserContent: response status = " + response.status + ":" + response.statusText);
-	        //smugdata.debugLog("getUserContent: response text = " + response.responseText);
-           if (response.ok) {
-              return(response.json());
-           }
-           throw new Error(response.status)
-        }).then(function(respjson) {
-           //respobj = JSON.parse(respjson);
-
-           for (var member in respjson.Response) {
-              destObj[member] = respjson.Response[member];
-           }
-
-           if (respjson.Expansions != undefined) {
-              destObj.Expansions = respjson.Expansions;
-           }
-
-           smugdata.currentState = state;
-           document.dispatchEvent(smugdata.statechangeevent);
-        }).catch(function(error) {
-           if (error == 401) {
-              smugdata.debugLog("Not Authorized for SmugMug");
-              smugdata.currentState = 'unauthorized';
-              document.dispatchEvent(smugdata.statechangeevent);
-           }
-           else {
-              /* Error from SmugMug */
-              smugdata.debugLog("Error connecting to " + smApi + " status: " + error);
-              smugdata.currentState = errorstate;
-              document.dispatchEvent(smugdata.statechangeevent);
-           }
-        });
-     }
-     else {
-        smugdata.debugLog("Error: smApi or destObj not defined");
-        smugdata.currentState = errorstate;
-     }
-  },
-  getContent: function(targetnode) {
-
-    /*
-         New way to fetching content.  This is needed so that that display can fetch an
-         album of background images and get everything it needs (i.e. all urls) to randomly display
-         different images.
-
+  getContent: function(node, pageSize, start) {
+     /*
+         New way to fetching content.
          I will use fetch and a promise to call the correct apis, and not use the state model.
-
          - The fetched data will be put under the node object, which should already be in the userdata tree
          - The returned data (via Promise) will be in the displayData format
-
          This could lead to a complete re-architecture of the smugdata.
-
          for future use:
 	        By default, fetch won't send or receive any cookies from the server,
 	        resulting in unauthenticated requests if the site relies on maintaining
            a user session (to send cookies, the credentials init option must be set).
-    */
+     */
      return (new Promise(function(resolve, reject) {
-     if (targetnode) {
-        var node = new Object();
-        if (targetnode.Type == 'Album') {
-           /* getalbumdata
-              what if node.Album already exists?  */
-           fetch(smugdata.smugmugapi + targetnode.Uris.Album + smugdata.albumFilterEncodedStr).then(function(response) {
-              //smugdata.debugLog("getUserContent: response status = " + response.status + ":" + response.statusText);
-	           //smugdata.debugLog("getUserContent: response text = " + response.responseText);
-              if (response.ok) {
-                 return(response.json());
-              }
-              throw new Error(response.status)
-           }).then(function(respjson) {
-              for (var member in respjson.Response) {
-                 node[member] = respjson.Response[member];
-              }
+        smugdata.smugmugapi = smugdata.smugmugProtocol + smugdata.smug_api + smugdata.apiVerbosity + "&api=";
+        if (node) {
+           if (node.Type === 'Album') {
+              if (node.Album === undefined || node.Start !== start) {
+                 smugdata.albumExpand.expand.AlbumImages.args.count = pageSize;
+                 smugdata.albumExpand.expand.AlbumImages.args.start = start;
+                 var albumencodedStr = "&_config=" + encodeURI(JSON.stringify(smugdata.albumExpand));
+                 fetch(smugdata.smugmugapi + node.Uris.Album.Uri + albumencodedStr).then(function(response) {
+                    //smugdata.debugLog("getUserContent: response status = " + response.status + ":" + response.statusText);
+      	           //smugdata.debugLog("getUserContent: response text = " + response.responseText);
+                    if (response.ok) {
+                       return(response.json());
+                    }
+                    throw new Error(response.status)
+                 }).then(function(respjson) {
+                    if (respjson.Response != undefined) {
+                       node.Album = respjson.Response;
+                       node.Count = node.Album.Album.ImageCount;
+                    }
+                    if (respjson.Expansions != undefined) {
+                       node.Expansions = respjson.Expansions;
+                       node.Start = node.Expansions[node.Album.Album.Uris.AlbumImages.Uri].Pages.Start;
+                    }
 
-              if (respjson.Expansions != undefined) {
-                 node.Expansions = respjson.Expansions;
-              }
-
-              /* getalbumimages
-                  Figured out that using expansions correctly I can get all of the image
-                  urls when get the albumimages.  I need to change this everywhere, reduces
-                  the number of api calls and simplies the states.
-
-                  For now use it to get everything for this node.
-
-                  Not sure what is going to happen if I store this in the node...
-                    - don't store in node for now, use a temporary object
-
-                  ToDo: enlarge count for this call, or make it a parameter
-
-              */
-              node.Album.Parent = node.Parent;
-              node.Album.AlbumImages = new Object();
-              fetch(smugdata.smugmugapi + node.Album.Uris.AlbumImages + "&_expand=ImageSizeDetails").then(function(response) {
-                 if (response.ok) {
-                    return(response.json());
+                    var rd = smugdata.generateReturnData(node);
+                    if (rd.status) {
+                       resolve(rd.data);
+                    } else {
+                       reject(rd.data);
+                    }
+                 }).catch(function(error) {
+                    if (error == 401) {
+                       smugdata.debugLog("Not Authorized for SmugMug");
+                       reject("Not Authorized for SmugMug");
+                    }
+                    else {
+                       /* Error from SmugMug */
+                       smugdata.debugLog("Error connecting to SmugMug status: " + error);
+                       reject("Error connecting to SmugMug status: " + error);
+                    }
+                 });
+              } else {
+                 /* node.Album is defined so we don't refetch the data
+                  - this is how we cache
+                  - with a large image repository we could endup using a lot of memory
+                  - need a method to delete nodes if memory is needed
+                 */
+                 var rd = smugdata.generateReturnData(node);
+                 if (rd.status) {
+                    resolve(rd.data);
+                 } else {
+                    reject(rd.data);
                  }
-                 throw new Error(response.status)
-              }).then(function(images) {
-                 for (var member in images.Response) {
-                    node.Album.AlbumImages[member] = images.Response[member];
+              }
+           }
+           else if (node.Type === 'Folder') {
+              if (node.Children === undefined || node.Start !== start) {
+                 var childrenencodedStr = "&count=" + pageSize + "&start=" + start + "&_config=" + encodeURI(JSON.stringify(smugdata.childrenExpand));
+                 fetch(smugdata.smugmugapi + node.Uris.ChildNodes.Uri + childrenencodedStr).then(function(response) {
+                    //smugdata.debugLog("getUserContent: response status = " + response.status + ":" + response.statusText);
+                    //smugdata.debugLog("getUserContent: response text = " + response.responseText);
+                    if (response.ok) {
+                       return(response.json());
+                    }
+                    throw new Error(response.status)
+                 }).then(function(respjson) {
+                    if (respjson.Response.Node != undefined) {
+                       node.Children = respjson.Response.Node;
+                       node.Count = respjson.Response.Pages.Total;
+                       node.Start = respjson.Response.Pages.Start;
+                    }
+                    if (respjson.Expansions != undefined) {
+                       node.Expansions = respjson.Expansions;
+                    }
+                    /* Now I have all the folder details and highlight images and sizes...*/
+                    var rd = smugdata.generateReturnData(node);
+                    if (rd.status) {
+                       resolve(rd.data);
+                    } else {
+                       reject(rd.data);
+                    }
+                 }).catch(function(error) {
+                    if (error == 401) {
+                       smugdata.debugLog("Not Authorized for SmugMug");
+                       reject("Not Authorized for SmugMug");
+                    }
+                    else {
+                       /* Error from SmugMug */
+                       smugdata.debugLog("Error connecting to SmugMug status: " + error);
+                       reject("Error connecting to SmugMug status: " + error);
+                    }
+                 });
+              } else {
+                 /* node.children is defined so we don't refetch the data
+                  - this is how we cache
+                  - with a large image repository we could endup using a lot of memory
+                  - need a method to delete nodes if memory is needed
+                 */
+                 var rd = smugdata.generateReturnData(node);
+                 if (rd.status) {
+                    resolve(rd.data);
+                 } else {
+                    reject(rd.data);
                  }
-                 if (images.Expansions != undefined) {
-                    node.Album.AlbumImages.Expansions = images.Expansions;
+              }
+           } else {
+               smugdata.debugLog("Unknown Type: " + node.Type);
+               reject("Unknown Type: " + node.Type);
+           }
+        } else {
+           smugdata.debugLog("Error: node not defined");
+           reject("Error: node not defined")
+        }
+     }));
+  },
+  generateReturnData : function(node) {
+     if (node) {
+        var returnData = new Object();
+        if (node.Type == 'Album') {
+           returnData.name = node.Album.Album.Name;
+           returnData.path = node.Album.Album.UrlPath;
+           returnData.type = "Container";
+           returnData.count = node.Count;
+           returnData.start = node.Start;
+           returnData.node = node;
+           returnData.parent = node.Parent;
+           returnData.children = [];
 
-                    /* Now I have all the Image Urls and image details for all AlbumImages...*/
-                    var returnData = new Object();
-                    returnData.name = node.Album.Name;
-                    returnData.path = node.Album.UrlPath;
-                    returnData.imagecount = node.Album.ImageCount;
-                    returnData.children = [];
-                    node.Album.AlbumImages.AlbumImage.forEach(function (child,i) {
-                       returnData.children[i] = new Object();
-                       returnData.children[i].name = child.FileName;
-                       returnData.children[i].type = child.Format;
-                       returnData.children[i].action = smugdata.nodeAction;
-                       returnData.children[i].node = child;
-                       returnData.children[i].parent = node;
-                       /* what if SmallImage does not exist? */
-                       //returnData.children[i].thumbUrl = smugdata.adjustURL(node.Album.AlbumImages.Expansions[child.Uris.ImageSizes.Uri].ImageSizes.SmallImageUrl);
+           if (node.Expansions != undefined) {
+              //node.Album.Album.Uris.AlbumImages.Uri   // this gives me the expansion key for AlbumImages
+              if (node.Expansions[node.Album.Album.Uris.AlbumImages.Uri].AlbumImage) {
+                 /* AlbumImage will be undefined if Album is empty */
+                 node.Expansions[node.Album.Album.Uris.AlbumImages.Uri].AlbumImage.forEach(function(child,i) {
+                    child.Parent = node;
+                    returnData.children[i] = new Object();
+                    returnData.children[i].name = child.FileName;
+                    returnData.children[i].type = child.Type = "Media";
+                    returnData.children[i].format = child.Format;
+                    returnData.children[i].node = child;
+                    returnData.children[i].parent = returnData;  // not sure I need this?
+                    returnData.children[i].path = child.FileName;
+                    returnData.children[i].originalwidth = child.OriginalWidth;
+                    returnData.children[i].originalheight = child.OriginalHeight;
+                    returnData.children[i].latitude = child.Latitude;
+                    returnData.children[i].longitude = child.Longitude;
+                    returnData.children[i].altitude = child.Altitude;
+                    returnData.children[i].date = child.Date;
 
-                       /* I want to return all of the image sizes and image size details, but remove the smugmug specific
-                          size descriptions, i.e. Small, Medium, Large, etc.  */
-                       returnData.children[i].imagesizes = [];
-                       var sizes = node.Album.AlbumImages.Expansions[child.Uris.ImageSizeDetails].ImageSizeDetails;
-                       sizes.UsableSizes.forEach(function(size,index) {
+                    /* I want to return all of the image sizes and image size details,
+                       but remove the smugmug specific
+                       size descriptions, i.e. Small, Medium, Large, etc.  */
+                    returnData.children[i].imagesizes = [];
+                    returnData.children[i].videosizes = [];
+                    var sizes = node.Expansions[child.Uris.ImageSizeDetails.Uri].ImageSizeDetails;
+                    var index = 0;
+                    var vindex = 0;
+                    sizes.UsableSizes.forEach(function(size) {
+                       if (size.includes("ImageSize")) {  //ES6
                           returnData.children[i].imagesizes[index] = sizes[size];
                           returnData.children[i].imagesizes[index].Url = smugdata.adjustURL(returnData.children[i].imagesizes[index].Url);
-                       });
+                          index++;
+                       } else if (size.includes("VideoSize")) {
+                          returnData.children[i].videosizes[vindex] = sizes[size];
+                          returnData.children[i].videosizes[vindex].Url = smugdata.adjustURL(returnData.children[i].videosizes[vindex].Url);
+                          vindex++;
+                       }
                     });
-                    resolve(returnData);
-                 }
-                 else {
-                    /* if not expansions, then something went wrong */
-                    smugdata.debugLog("Error: No Expansions");
-                    reject("Error: No Expansions");
-                 }
-             });
-           }).catch(function(error) {
-              if (error == 401) {
-                 smugdata.debugLog("Not Authorized for SmugMug");
-                 reject("Not Authorized for SmugMug");
+
+                    /* make sure sizes arrays are sorted smallest to largest */
+                    smugdata.sortSizes(returnData.children[i].imagesizes);
+                    smugdata.sortSizes(returnData.children[i].videosizes);
+                 });
               }
-              else {
-                 /* Error from SmugMug */
-                 smugdata.debugLog("Error connecting to SmugMug status: " + error);
-                 reject("Error connecting to SmugMug status: " + error);
-              }
-           });
+              return({status: true, data: returnData});
+           }
+           else {
+              // if no expansions, then something went wrong
+              smugdata.debugLog("Error: No Expansions");
+              return({status: false, data: "Error: No Expansions"});
+           }
+        }
+        else if (node.Type === 'Folder') {
+           returnData.name = node.Name;
+           returnData.path = node.UrlPath;
+           returnData.type = "Container";
+           returnData.count = node.Count;
+           returnData.start = node.Start;
+           returnData.node = node;
+           returnData.parent = node.Parent;
+           returnData.children = [];
+
+           if (node.Children != undefined && node.Expansions != undefined) {
+              node.Children.forEach(function(child,i) {
+                 child.Parent = node;
+                 returnData.children[i] = new Object();
+                 returnData.children[i].name = child.Name;
+                 returnData.children[i].type = "Container";  //Folder can only contain Folders and Albums
+                 returnData.children[i].node = child;
+                 returnData.children[i].parent = returnData; // not sure I need this?
+                 returnData.children[i].path = child.UrlPath;
+                 var image = node.Expansions[child.Uris.HighlightImage.Uri].Image;
+                 /* if album or folder is empty the highlight image will be undefined */
+                 if (image) {
+                    returnData.children[i].highlightimagefilename = image.FileName;
+                    returnData.children[i].originalheight = image.OriginalHeight;
+                    returnData.children[i].originalwidth = image.OriginalWidth;
+                    var sizes = node.Expansions[image.Uris.ImageSizeDetails.Uri].ImageSizeDetails;
+                    returnData.children[i].imagesizes = [];
+                    var index = 0;
+                    sizes.UsableSizes.forEach(function(size) {
+                       if (size.includes("ImageSize")) {  //ES6
+                          returnData.children[i].imagesizes[index] = sizes[size];
+                          returnData.children[i].imagesizes[index].Url = smugdata.adjustURL(returnData.children[i].imagesizes[index].Url);
+                          index++;
+                       }
+                    });
+                    /* make sure imagesizes array is sorted smallest to largest */
+                    smugdata.sortSizes(returnData.children[i].imagesizes);
+                 }
+              });
+              return({status: true, data: returnData});
+           }
+           else {
+              // if no expansions, then something went wrong
+              smugdata.debugLog("Error: No Expansions");
+              return({status: false, data: "Error: No Expansions"});
+           }
         }
         else {
-           smugdata.debugLog("Not Album");
-           reject("Not Album");
+           smugdata.debugLog("Unknown Type: " + node.Type);
+           return({status: false, data: "Unknown Type: " + node.Type});
         }
+     } else {
+        smugdata.debugLog("Error: Node not defined");
+        return({status: false, data: "Error: Node not defined"});
      }
-     else {
-        smugdata.debugLog("Error: targetnode not defined");
-        reject("Error: targetnode not defined")
-     }}));
   },
-  nodeAction : function() {
-      /* Key function that is called whenever a item is selected...
-         Must determine the next state and data to fetch
-         node could be an node that is a folder or an album
-         or node could be an image or video that is not a node */
-
-      var node = this.node;
-      if (node.Type === undefined && node.Format != undefined) {
-      	/* not sure about this, Type should be set by now */
-         smugdata.debugLog("[smugdata.nodeAction] Setting node.Type = Media");
-      	node.Type = 'Media';
-      }
-      if (!node.Parent) {
-         node.Parent = smugdata.currentStateData;
-      }
-
-      switch (node.Type) {
-     		case 'Album':
-     		   /* Sigh...Albums don't have children
-     		   		Node->Uris->Albums
-     		   		Album->AlbumImages
-     		   */
-     		   smugdata.currentState = 'getalbumdata';
-     		   smugdata.currentStateData = node;
-     		   document.dispatchEvent(smugdata.statechangeevent);
-     		break;
-
-         case 'AlbumImages':
-           smugdata.currentState = 'getalbumimages';
-           smugdata.currentStateData = node;
-           document.dispatchEvent(smugdata.statechangeevent);
-         break;
-
-     		case 'Folder':
-     		   if (node.IsRoot) {
-     		   	  smugdata.currentState = 'getnodedata';
-     		   }
-     		   else {
-     		   	  smugdata.currentState = 'getchildren';
-     		   }
-     		   smugdata.currentStateData = node;
-     		   document.dispatchEvent(smugdata.statechangeevent);
-     		break;
-
-     		case 'Media':
-     		   /* Current node is a single media item, get the URL */
-     		   if (node.IsVideo) {
-     		   	   smugdata.currentState = 'getvideourl';
-     		   	   smugdata.currentStateData = node;
-     		   	   document.dispatchEvent(smugdata.statechangeevent);
-     		   }
-     		   else {
-     		   	   smugdata.currentState = 'getimageurl';
-     		   	   smugdata.currentStateData = node;
-     		   	   document.dispatchEvent(smugdata.statechangeevent);
-     		   }
-     		break;
-
-         default:
-            smugdata.debugLog("[smugdata.nodeAction] Unknown Type: " + node.Type);
-         break;
-  	   }
-   },
-   getMoreData : function(direction) {
-      if (direction == "PrevPage" || direction == "NextPage") {
-         if ( (smugdata.currentStateData.Type == "Folder") && (smugdata.currentStateData.Children.Pages[direction] != undefined) ) {
-            smugdata.currentState = 'getfolder' + direction;
-            document.dispatchEvent(smugdata.statechangeevent);
-         }
-         else if ( (smugdata.currentStateData.Type = "AlbumImages") && (smugdata.currentStateData.AlbumImages.Pages[direction] != undefined) ) {
-            smugdata.currentState = 'getalbum' + direction;
-            document.dispatchEvent(smugdata.statechangeevent);
-         }
-         else {
-	         /* don't do anything */
-            smugdata.debugLog("[smugdata.getMoreData] No " + direction);
-         }
-      }
-   },
+  sortSizes : function(sizes) {
+     sizes.sort(function(s1,s2) {
+        if (s1.Width > s2.Width) {
+           return 1;
+        } else if (s1.Width < s2.Width) {
+           return -1;
+        } else {
+           return 0;
+        }
+     });
+  },
    adjustURL : function(stUrl) {
        if (smugdata.bProxy) {
          /* get host from url */
@@ -764,6 +435,6 @@ var smugdata = {
             }
          }
        }
-       return stUrl;  /* if proxy is disabled or no match just return unmodified url */
+       return stUrl;  /* if proxy is disabled or no match, just return unmodified url */
    }
 }

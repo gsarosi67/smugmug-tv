@@ -1,0 +1,18 @@
+ToDo:
+
+2/11/2020
+
+- Test, test, test
+- test on TV
+- analyze memory usage
+- add performance monitoring
+- add a settings dialog
+- authentication
+- basketball 14-15 error
+- cleanup smugdata2.js
+- move 2 versions to main
+- add item navitgation when displaying media. i.e. arrow keys should move to new content
+- keep some additional context about each data node so that we can go back to the select item
+  - For example if I select item 15 in a container and that opens another container, when I go back to the original container item 15 should be selected
+- implement something that allows us to release memory by deleting previously fetched nodes
+  - this could also go along with modifying paging and saving the data from each page instead of the reload

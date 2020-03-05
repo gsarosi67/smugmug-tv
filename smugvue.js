@@ -16,7 +16,7 @@ var smugvue = new Vue({
       currentItem : -1,
       previousAnchor : -1,
       spinner : undefined,
-      bDebug : true,
+      bDebug : false,
       pageSize : 50,
       startNum : 1,
       rowsize : 0,   /* number of items in one row, calculated at the end of the rendering */
@@ -554,7 +554,7 @@ var smugvue = new Vue({
                    /* the fullscreenElement does not seem to exist on the Samsung TV
 
                       - how can I tell if the display is in fullscreenmode or not??
-                      - also the fullscreenchange events does not fire 
+                      - also the fullscreenchange events does not fire
 
                   */
                    if (document.fullscreenElement == null)  {

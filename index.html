@@ -15,23 +15,31 @@
    <body>
       <div id="smugvue" class='screen' v-bind:style="{ backgroundImage: bkgUrl }">
          <span id='ruler' class='ruler'></span>
-       <template v-if="currentDisplayData.type === 'Container'">
-         <div id='header' class='header'>
-            <div id='appname' class="appname">SmugMug for TV</div>
-            <div id='user' class="user" v-bind:style="usernameStyle()">{{ username.toUpperCase() }}</div>
-            <div id='path' class="path">{{ currentDisplayData.path }}</div>
-         </div>
 
-         <div id='topinfo'  class='infoarea topinfo'>
-            <template v-if='isPrev()'>
-               <input id="topmorebutton" class="morebutton" type="button" v-on:click="containermore('PrevPage')" value="Show Previous...">
-            </template>
-         </div>
+         <template v-if="mediaPlayerData === undefined">
+            <div id='header' class='header'>
+               <div id='appname' class="appname">SmugMug for TV</div>
+               <div id='user' class="user" v-bind:style="usernameStyle()">{{ username.toUpperCase() }}</div>
+               <div id='path' class="path">{{ displayData.path }}</div>
+            </div>
 
+            <div id='topinfo'  class='infoarea topinfo'>
+               <template v-if='isPrev()'>
+                  <input id="topmorebutton" class="morebutton" type="button" v-on:click="containermore('PrevPage')" value="Show Previous...">
+               </template>
+            </div>
+
+            <div id='bottominfo'  class='infoarea bottominfo'>
+               <template v-if='isMore()'>
+                  <input id="bottommorebutton" class="morebutton" type="button" v-on:click="containermore('NextPage')" value="Show More...">
+               </template>
+            </div>
+         </template>
+
+         <!-- moving this out of the conditional template, so it will always be active and we will have a list of anchors -->
          <div id="contentsection" class="content">
-
                <div id="grid">
-                  <div v-for="(child,index) in currentDisplayData.children" class="contententry" v-bind:style="selected(index)">
+                  <div v-for="(child,index) in displayData.children" class="contententry" v-bind:style="selected(index)">
                      <a href="javascript:void(0);" v-on:click="itemaction(child)">
                         <div class="thumb">
                            <img class="thumbimg" v-bind:src="contentEntryImage(child)">
@@ -42,27 +50,21 @@
                      </a>
                   </div>
                </div>
-
          </div>
+            
 
-         <div id='bottominfo'  class='infoarea bottominfo'>
-           <template v-if='isMore()'>
-              <input id="bottommorebutton" class="morebutton" type="button" v-on:click="containermore('NextPage')" value="Show More...">
-           </template>
-         </div>
-       </template>
-         <template v-else-if="currentDisplayData.type === 'Media' && isImage(currentDisplayData.format)">
+         <template v-if="mediaPlayerData !== undefined && isImage(mediaPlayerData.format)">
            <div id="imageplayerdiv" class="player" v-on:click="mediaended()">
               <img id="image" class="playerimg" v-bind:src="displayImageUrl()"></img>
            </div>
          </template>
-         <template v-else-if="currentDisplayData.type === 'Media' && isVideo(currentDisplayData.format)">
+         <template v-else-if="mediaPlayerData !== undefined && isVideo(mediaPlayerData.format)">
            <div id="videoplayer" class="player">
-              <div v-if="currentDisplayData.title !== undefined" class="vidtitle" id="vidname">
-                  {{ currentDisplayData.title }}
+              <div v-if="mediaPlayerData.title !== undefined" class="vidtitle" id="vidname">
+                  {{ mediaPlayerData.title }}
               </div>
-              <div v-else-if="currentDisplayData.filename !== undefined" class="vidtitle" id="vidname">
-                  {{ currentDisplayData.filename }}
+              <div v-else-if="mediaPlayerData.filename !== undefined" class="vidtitle" id="vidname">
+                  {{ mediaPlayerData.filename }}
               </div>
               <video id="video" class="playerimg" controls="true" autoplay v-on:ended="mediaended()" v-bind:src="displayVideoUrl()"></video>
            </div>
@@ -99,5 +101,5 @@
           <li class='infoentry'>No data available</li>
        </ul>
    </script>
-   <script type='text/javascript' src='smugvue.js?ver=4'></script>
+   <script type='text/javascript' src='smugvue.js?ver=11'></script>
 </html>

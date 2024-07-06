@@ -8,7 +8,7 @@ var smugvue = new Vue({
    el: '#smugvue',
    data : {
       displayData : {username: "sarosi", path: "/"},
-      currentDisplayData : undefined,
+      mediaPlayerData : undefined,
       logScreen : {
          logs : []   /* this could get kind of big, how can we limit the size? */
       },
@@ -57,9 +57,23 @@ var smugvue = new Vue({
          var self=this;
          this.printDbgMessage("displayData changed")
          Vue.nextTick(function() {
-            self.anchors = document.getElementsByTagName("a")
-            self.rowsize = self.calcrowsize(self.anchors)
+            
             if (self.direction) {
+               if (self.direction != 'PlayMedia' && self.direction != 'MediaEnd') {
+                  /*
+                      The HTMLCollection of anchors is live! Which means that it will update
+                      as the DOM changes.  
+                      Impact:
+                        - don't really need to call this repeatedly
+                        - when a media is playing and the container is replace with a video or image tag,
+                          the list of anchors is gone, and we can't navigate
+                            - so either I need to somehow save this list of anchors, but only when playing media
+                            - or I figure out a way for the media to not replace the container of anchors
+                            - the method document.querySelectorAll() will return a static list
+                  */
+                  //self.anchors = document.getElementsByTagName("a")
+                  self.rowsize = self.calcrowsize(self.anchors)
+               }
                switch (self.direction) {
                   case 'PrevPage':
                      if (self.anchors.length > 0) {
@@ -88,8 +102,12 @@ var smugvue = new Vue({
                   break;
                }
             }
+            //if ((self.anchors && self.anchors.length > 0) && (self.direction != 'PlayMedia' && self.direction != 'MediaEnd')) {
             if (self.anchors && self.anchors.length > 0) {
                self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+            }
+            if (self.mediaPlayerData !== undefined) {
+               self.itemaction(self.displayData.children[self.currentItem])
             }
         })
       }
@@ -102,10 +120,13 @@ var smugvue = new Vue({
       this.setErrorFunction()
       document.addEventListener('keydown', this.keyDown, false)
       this.processCommandline(document.URL)
-      this.currentDisplayData = this.displayData
+     
 
       self.printDbgMessage("Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
       this.initData(smugdata)
+
+      // I think I only need to set this once and it will update...
+      self.anchors = document.getElementsByTagName("a")
 
       window.addEventListener('resize', _.debounce(function() {
           self.printDbgMessage("Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
@@ -166,9 +187,8 @@ var smugvue = new Vue({
              - this might be an issue on some TVs, what is the alternative??
          */
          this.displayData = Object.assign({}, data)
-         this.currentDisplayData = this.displayData;
 
-         this.printDbgMessage("updateDisplay: Count: " + this.currentDisplayData.count + " Start: " + this.currentDisplayData.start)
+         this.printDbgMessage("updateDisplay: Count: " + this.displayData.count + " Start: " + this.displayData.start)
 
          if (this.displayData.children) {
            this.calcImageSize(Math.floor(document.getElementById(this.screenId).getBoundingClientRect().width),
@@ -250,7 +270,7 @@ var smugvue = new Vue({
       mediaended : function(e) {
          this.direction = "MediaEnd"
          this.printDbgMessage(this.direction)
-         this.currentDisplayData = this.displayData
+         this.mediaPlayerData = undefined
       },
       itemaction : function(item) {
          if (item) {
@@ -264,7 +284,7 @@ var smugvue = new Vue({
             }
             else {
                self.direction = "PlayMedia"
-               self.currentDisplayData = item
+               self.mediaPlayerData = item
             }
             self.printDbgMessage(self.direction)
          }
@@ -279,29 +299,29 @@ var smugvue = new Vue({
          self.printDbgMessage(self.direction)
       },
       isMore : function() {
-         return ((this.currentDisplayData.start + this.pageSize) < this.currentDisplayData.count)
+         return ((this.displayData.start + this.pageSize) < this.displayData.count)
       },
       isPrev : function() {
-         return (this.currentDisplayData.start > 1)
+         return (this.displayData.start > 1)
       },
       containermore : function(direction) {
          this.direction = direction
          this.printDbgMessage(direction)
          if (direction === 'PrevPage') {
             if ( this.isPrev() ) {
-               this.startNum = this.currentDisplayData.start - this.pageSize
+               this.startNum = this.displayData.start - this.pageSize
                if (this.startNum < 0) this.startNum = 1
-               this.printDbgMessage("Fetching Prev: Count: " + this.currentDisplayData.count + " Start: " + this.startNum)
-               smugdata.getContent(this.currentDisplayData.node,this.pageSize,this.startNum).then(this.updateDisplay).catch(function(error) {
+               this.printDbgMessage("Fetching Prev: Count: " + this.displayData.count + " Start: " + this.startNum)
+               smugdata.getContent(this.displayData.node,this.pageSize,this.startNum).then(this.updateDisplay).catch(function(error) {
                   this.printDbgMessage(error)
                })
             }
          }
          else if (direction === 'NextPage') {
             if ( this.isMore() ) {
-               this.startNum = this.currentDisplayData.start + this.pageSize
-               this.printDbgMessage("Fetching More: Count: " + this.currentDisplayData.count + " Start: " + this.startNum)
-               smugdata.getContent(this.currentDisplayData.node,this.pageSize,this.startNum).then(this.updateDisplay).catch(function(error) {
+               this.startNum = this.displayData.start + this.pageSize
+               this.printDbgMessage("Fetching More: Count: " + this.displayData.count + " Start: " + this.startNum)
+               smugdata.getContent(this.displayData.node,this.pageSize,this.startNum).then(this.updateDisplay).catch(function(error) {
                   this.printDbgMessage(error)
                })
             }
@@ -332,7 +352,7 @@ var smugvue = new Vue({
       displayImageUrl : function() {
          /* find the url to the image size that closest matches the calcuated image size for the current view.
          */
-         return this.findImageSize(this.currentDisplayData.originalwidth, this.currentDisplayData.originalheight, this.currentDisplayData.imagesizes,{
+         return this.findImageSize(this.mediaPlayerData.originalwidth, this.mediaPlayerData.originalheight, this.mediaPlayerData.imagesizes,{
                                       Width: Math.floor(document.getElementById(this.screenId).getBoundingClientRect().width),
                                       Height: Math.floor(document.getElementById(this.screenId).getBoundingClientRect().height)
                                    })
@@ -341,7 +361,7 @@ var smugvue = new Vue({
          /* find the url to the image size that closest matches the calcuated image size for the current view.
             - not sure what about this one, need to figure out the video formats supported
          */
-         return this.findImageSize(this.currentDisplayData.originalwidth, this.currentDisplayData.originalheight, this.currentDisplayData.videosizes,{
+         return this.findImageSize(this.mediaPlayerData.originalwidth, this.mediaPlayerData.originalheight, this.mediaPlayerData.videosizes,{
                                       Width: Math.floor(document.getElementById(this.screenId).getBoundingClientRect().width),
                                       Height: Math.floor(document.getElementById(this.screenId).getBoundingClientRect().height)
                                    })
@@ -530,8 +550,8 @@ var smugvue = new Vue({
 
            case 55:      /* 7 digit */
            case 8:       /* Xfinity Last Key / Keyboard backspace key */
-              if (this.currentDisplayData.type === 'Container') {
-                 if (this.currentDisplayData.parent) {
+              if (this.mediaPlayerData === undefined) {
+                 if (this.displayData.parent) {
                     /* container that is not root, move to the previous container
                         - ToDo: keep some additional context about each data node
                           so that we can go back to the select item
@@ -539,18 +559,19 @@ var smugvue = new Vue({
                             another container, when I go back to the original container item
                             15 should be selected.
                     */
-                    this.containerParent(this.currentDisplayData.parent)
+                    this.containerParent(this.displayData.parent)
                  }
               }
               else {
                  /* must be a media item */
                  this.mediaended()
+                 this.scroll(this.anchors[this.currentItem].parentNode,document.getElementById(this.contentareaId))
               }
               bHandled = true;
            break;
 
            case 57: /* 9 digit */
-               if (this.currentDisplayData.type === "Container") {
+               if (this.mediaPlayerData === undefined) {
                    /* the fullscreenElement does not seem to exist on the Samsung TV
 
                       - how can I tell if the display is in fullscreenmode or not??
@@ -563,9 +584,9 @@ var smugvue = new Vue({
                       this.closeFullscreen()
                    }
                 }
-                else if (this.currentDisplayData.type === "Media") {
+                else {
                    if (document.fullscreenElement == null)  {
-                      if (this.isVideo(this.currentDisplayData.format)) {
+                      if (this.isVideo(this.mediaPlayerData.format)) {
                          this.openFullscreen(document.getElementById(this.videotagId))
                       } else {
                          this.openFullscreen(document.getElementById(this.imagetagId))
@@ -580,15 +601,17 @@ var smugvue = new Vue({
            case 53: /* 5 digit */
            case 32: /* space key */
            case 179: /* play/pause Xfinity */
-              if (this.currentDisplayData.type === "Container") {
-                 this.itemaction(this.currentDisplayData.children[this.currentItem])
+              if (this.mediaPlayerData === undefined) {
+                this.itemaction(this.displayData.children[this.currentItem])
               }
-              else if (this.currentDisplayData.type === "Media") {
-                 if (this.isVideo(this.currentDisplayData.format)) {
+              else {
+                 if (this.isVideo(this.mediaPlayerData.format)) {
                     this.playpause()
                  }
                  else {
                     this.mediaended()
+                    // I think this will work...
+                    this.scroll(this.anchors[this.currentItem].parentNode,document.getElementById(this.contentareaId))
                  }
               }
               bHandled = true;
@@ -598,7 +621,6 @@ var smugvue = new Vue({
            case 37: /* Left arrow */
            case 50: /* 2 digit (up) */
            case 38: /* Up arrow */
-              if (this.currentDisplayData.type == "Container") {
                  var newItem;
                  if (EKC == 37 || EKC == 52) {
                     newItem = this.currentItem - 1;   /* 4 digit or left */
@@ -617,20 +639,21 @@ var smugvue = new Vue({
                  }
                  else {
                     this.currentItem = newItem
-                    /* scroll */
-                    var self=this
-                    self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
-
+                    if (this.mediaPlayerData === undefined) {
+                       /* scroll */
+                       var self=this
+                       self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+                    } else {
+                       this.itemaction(this.displayData.children[this.currentItem])
+                    }
                  }
                  bHandled = true;
-               }
              break;
 
              case 54: /* 6 digit (right) */
              case 39: /* Right arrow */
              case 56: /* 8 digit (down) */
              case 40: /* Down arrow */
-             if (this.currentDisplayData.type == "Container") {
                 var newItem;
                 if (EKC == 39 || EKC == 54) {
                    newItem = this.currentItem+1;      /* 6 digit or right */
@@ -654,12 +677,15 @@ var smugvue = new Vue({
                 }
                 else {
                    this.currentItem = newItem;
-                   /* scroll */
-                   var self=this
-                   self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+                   if (this.mediaPlayerData === undefined) {
+                      /* scroll */
+                      var self=this
+                      self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+                   } else {
+                      this.itemaction(this.displayData.children[this.currentItem])
+                   }
                 }
                 bHandled = true;
-             }
              break;
 
              case 51: /* 3 digit */

@@ -9,7 +9,7 @@
       <script src="https://cdn.jsdelivr.net/npm/lodash@4.13.1/lodash.min.js"></script>
       <script type='text/javascript' src='smugdata.js?ver=4'></script>
 
-      <link rel="stylesheet" href="smugvue.css?ver=7">
+      <link rel="stylesheet" href="smugvue.css?ver=9">
    </head>
 
    <body>
@@ -44,6 +44,11 @@
                         <div class="thumb">
                            <img class="thumbimg" v-bind:src="contentEntryImage(child)">
                         </div>
+                        <template v-if="isVideo(child.format)">
+                           <div class="videoicon">
+                              <img src="video_icon.png">
+                           </div>
+                        </template>
                         <div class="contentlabel">
                            {{ child.name }}
                         </div>

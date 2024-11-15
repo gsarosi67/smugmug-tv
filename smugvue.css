@@ -108,13 +108,13 @@ body {
 .morebutton {
    position: relative;
    top: 2%;
-   /* left: 38%; */
-   left: 0;
-   font-size: 16px;
+   text-align: center;
+   width: 100%;
+   font-size: 18px;
 	border-style: none;
-   color: rgb(104,204,222);
+   color: rgb(1, 10, 12);
    z-index: 201;
-   background-color: black;
+   background-color: rgb(114, 184, 189);
 	text-decoration: none;
    cursor: pointer;
 }

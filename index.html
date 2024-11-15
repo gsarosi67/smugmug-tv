@@ -9,7 +9,7 @@
       <script src="https://cdn.jsdelivr.net/npm/lodash@4.13.1/lodash.min.js"></script>
       <script type='text/javascript' src='smugdata.js?ver=4'></script>
 
-      <link rel="stylesheet" href="smugvue.css?ver=9">
+      <link rel="stylesheet" href="smugvue.css?ver=12">
    </head>
 
    <body>
@@ -40,7 +40,7 @@
          <div id="contentsection" class="content">
                <div id="grid">
                   <div v-for="(child,index) in displayData.children" class="contententry" v-bind:style="selected(index)">
-                     <a href="javascript:void(0);" v-on:click="itemaction(child)">
+                     <a href="javascript:void(0);" v-on:click="itemaction(child)" v-on:mouseenter="itementer(child,index)">
                         <div class="thumb">
                            <img class="thumbimg" v-bind:src="contentEntryImage(child)">
                         </div>
@@ -106,5 +106,5 @@
           <li class='infoentry'>No data available</li>
        </ul>
    </script>
-   <script type='text/javascript' src='smugvue.js?ver=11'></script>
+   <script type='text/javascript' src='smugvue.js?ver=16'></script>
 </html>

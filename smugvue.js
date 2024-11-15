@@ -119,6 +119,7 @@ var smugvue = new Vue({
       var self = this
       this.setErrorFunction()
       document.addEventListener('keydown', this.keyDown, false)
+      //document.addEventListener('mousemove', this.mouseMove, false)
       this.processCommandline(document.URL)
      
 
@@ -529,6 +530,19 @@ var smugvue = new Vue({
         } else {
            this.printDbgMessage("Exit FullScreen not supported")
         }
+     },
+     mouseMove : function(event) {
+        var x = event.clientX
+        var y = event.clientY
+        var moveX = event.movementX
+        var moveY= event.movementY
+        this.printDbgMessage("x,y: " + x + "," + y)
+        this.printDbgMessage("movex,movey: " + moveX + "," + moveY)
+     },
+     itementer : function(item,index) {
+        this.printDbgMessage("itementer: index = " + index)
+        this.currentItem = index
+        this.scroll(this.anchors[this.currentItem].parentNode,document.getElementById(this.contentareaId))
      },
      keyDown : function(event) {
         var EKC = event.keyCode;

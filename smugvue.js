@@ -122,6 +122,13 @@ var smugvue = new Vue({
       //document.addEventListener('mousemove', this.mouseMove, false)
       this.processCommandline(document.URL)
      
+      window.addEventListener("popstate", function(event) {
+          printDbgMessage("popstate event: ")
+          state = event.state;
+          if (state) {
+            printDbgMessage("Link Id: " + state["currlinkid"] + " Page Id: " + state["currpageid"])
+          }
+      },true)
 
       self.printDbgMessage("Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
       this.initData(smugdata)

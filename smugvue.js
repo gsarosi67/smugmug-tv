@@ -17,6 +17,7 @@ var smugvue = new Vue({
       previousAnchor : -1,
       spinner : undefined,
       bDebug : false,
+      bmouseDebug : false,
       pageSize : 50,
       startNum : 1,
       rowsize : 0,   /* number of items in one row, calculated at the end of the rendering */
@@ -293,6 +294,22 @@ var smugvue = new Vue({
                   }
                   else if (params[i].substring(equal) == "false") {
                      bProxy = false
+                  }
+               }
+               else if (params[i].substring(0,equal) == "debug") {
+                  if (params[i].substring(equal+1) == "true") {
+                     this.bDebug = true
+                  }
+                  else if (params[i].substring(equal) == "false") {
+                     this.bDebug = false
+                  }
+               }
+               else if (params[i].substring(0,equal) == "mousedebug") {
+                  if (params[i].substring(equal+1) == "true") {
+                     this.bmouseDebug = true
+                  }
+                  else if (params[i].substring(equal) == "false") {
+                     this.bmouseDebug = false
                   }
                }
      		   }
@@ -578,8 +595,10 @@ var smugvue = new Vue({
         var y = event.clientY
         var moveX = event.movementX
         var moveY= event.movementY
-        this.printDbgMessage("x,y: " + x + "," + y)
-        this.printDbgMessage("movex,movey: " + moveX + "," + moveY)
+        if (this.bmouseDebug) {
+            this.printDbgMessage("x,y: " + x + "," + y)
+            this.printDbgMessage("movex,movey: " + moveX + "," + moveY)
+        }
      },
      itementer : function(item,index) {
         //this.printDbgMessage("itementer: index = " + index)

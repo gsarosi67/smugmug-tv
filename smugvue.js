@@ -7,7 +7,7 @@ Vue.component('info-tree', {
 var smugvue = new Vue({
    el: '#smugvue',
    data : {
-      version : "1.10.3",
+      version : "1.10.6",
       displayData : {username: "sarosi", path: "/"},
       mediaPlayerData : undefined,
       logScreen : {
@@ -334,6 +334,10 @@ var smugvue = new Vue({
          this.direction = "MediaEnd"
          this.printDbgMessage("[mediaended] direction: " + this.direction)
          this.mediaPlayerData = undefined
+
+         // Need to reset the displayData path and name to remove the media item
+         this.displayData.path = this.displayData.path.substring(0,this.displayData.path.lastIndexOf("/"))
+         this.displayData.name = this.displayData.name.substring(0,this.displayData.name.lastIndexOf("/"))
       },
       itemaction : function(item) {
          if (item) {
@@ -343,6 +347,24 @@ var smugvue = new Vue({
             }
             else {
                self.direction = "PlayMedia"
+
+               // Need to add the media file name to the path and to the window history so that 
+               // the back button pop event works correctly
+               self.displayData.path += "/" + item.path
+               self.displayData.name += "/" + item.name
+               if (self.displayData.name){
+                  document.title = self.displayData.name
+               }
+     
+               self.printDbgMessage("[itemaction before pushState] History Size: " + window.history.length 
+                 + " History State: " + JSON.stringify(window.history.state))
+     
+               if ((window.history.state == null) || (self.displayData.path != window.history.state.path)) {
+                  window.history.pushState({"path":self.displayData.path,"name":self.displayData.name},self.displayData.name)
+                  self.printDbgMessage("[itemaction after pushState] History Size: " + window.history.length 
+                                       + " History State: " + JSON.stringify(window.history.state))
+               }
+               //This triggers the playback the media player is hidden until it is assigned an item to play
                self.mediaPlayerData = item
             }
             self.printDbgMessage("[itemaction] direction: " + self.direction)

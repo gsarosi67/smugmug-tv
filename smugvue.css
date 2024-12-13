@@ -61,6 +61,14 @@ body {
    left: 2%;
 }
 
+.appversion {
+   float: left;
+   position: relative;
+   top: 60%;
+   left: 2%;
+   font-size: 10px;
+}
+
 .user {
    /* float: right; */
    position: absolute;

@@ -7,6 +7,7 @@ Vue.component('info-tree', {
 var smugvue = new Vue({
    el: '#smugvue',
    data : {
+      version : "1.10.3",
       displayData : {username: "sarosi", path: "/"},
       mediaPlayerData : undefined,
       logScreen : {
@@ -56,7 +57,7 @@ var smugvue = new Vue({
       displayData : function() {
          /* Get the list of anchors to navigate */
          var self=this;
-         this.printDbgMessage("displayData changed")
+         this.printDbgMessage("[displayData] data changed detected")
          Vue.nextTick(function() {
             
             if (self.direction) {
@@ -124,7 +125,7 @@ var smugvue = new Vue({
       this.processCommandline(document.URL)
      
       window.addEventListener("popstate", function(event) {
-          self.printDbgMessage("popstate event: ")
+          self.printDbgMessage("[popstate] event: ")
           state = event.state;
           if (state) {
             self.printDbgMessage("[popstate] path: " + state.path + ": " + self.pathSize(state.path) 
@@ -144,14 +145,14 @@ var smugvue = new Vue({
           }
       },true)
 
-      self.printDbgMessage("Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
+      self.printDbgMessage("[created] Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
       this.initData(smugdata)
 
       // I think I only need to set this once and it will update...
       self.anchors = document.getElementsByTagName("a")
 
       window.addEventListener('resize', _.debounce(function() {
-          self.printDbgMessage("Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
+          self.printDbgMessage("[resize] Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
           if (self.displayData.children) {
              self.calcImageSize(Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width),
                                 Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height),
@@ -160,7 +161,7 @@ var smugvue = new Vue({
       },200), false)
 
       document.addEventListener('fullscreenchange', function(event) {
-         self.printDbgMessage("fullscreenchange event, fullscreenElement: " + document.fullscreenElement)
+         self.printDbgMessage("[fullscreenchange] fullscreenElement: " + document.fullscreenElement)
       })
    },
    methods : {
@@ -170,7 +171,7 @@ var smugvue = new Vue({
              dataSource.getUserNode(this.username, this.printDbgMessage).then(function(data) {
                 self.startNum = 1
                 dataSource.getContent(data.node,self.pageSize,self.startNum).then(self.updateDisplay).catch(function(error) {
-                self.printDbgMessage(error)
+                self.printDbgMessage('[initData] ' + error)
              })
            });
          }
@@ -214,7 +215,6 @@ var smugvue = new Vue({
          newNavNum = data.NavNum
          this.displayData = Object.assign({}, data)
 
-         
          /* 
             Can I add each new "page" display to the history?
               - instead of having some index, can I use the path length?
@@ -225,18 +225,17 @@ var smugvue = new Vue({
          if (this.displayData.name){
              document.title = this.displayData.name
          }
+         this.printDbgMessage("[updateDisplay] Count: " + this.displayData.count + " Start: " + this.displayData.start 
+            + " displayData.path: " + this.displayData.path)
 
          this.printDbgMessage("[updateDisplay before pushState] History Size: " + window.history.length 
             + " History State: " + JSON.stringify(window.history.state))
 
-         if (this.displayData.path != window.history.state.path) {
+         if ((window.history.state == null) || (this.displayData.path != window.history.state.path)) {
             window.history.pushState({"path":this.displayData.path,"name":this.displayData.name},this.displayData.name)
+            this.printDbgMessage("[updateDisplay after pushState] History Size: " + window.history.length 
+                                 + " History State: " + JSON.stringify(window.history.state))
          }
-
-         this.printDbgMessage("[updateDisplay] Count: " + this.displayData.count + " Start: " + this.displayData.start 
-                               + " displayData.path: " + this.displayData.path)
-         this.printDbgMessage("[updateDisplay after pushState] History Size: " + window.history.length 
-                              + " History State: " + JSON.stringify(window.history.state))
 
          if (this.displayData.children) {
            this.calcImageSize(Math.floor(document.getElementById(this.screenId).getBoundingClientRect().width),
@@ -333,7 +332,7 @@ var smugvue = new Vue({
       },
       mediaended : function(e) {
          this.direction = "MediaEnd"
-         this.printDbgMessage(this.direction)
+         this.printDbgMessage("[mediaended] direction: " + this.direction)
          this.mediaPlayerData = undefined
       },
       itemaction : function(item) {
@@ -346,7 +345,7 @@ var smugvue = new Vue({
                self.direction = "PlayMedia"
                self.mediaPlayerData = item
             }
-            self.printDbgMessage(self.direction)
+            self.printDbgMessage("[itemaction] direction: " + self.direction)
          }
       },
       getNodeContent : function(node) {
@@ -354,9 +353,9 @@ var smugvue = new Vue({
          self.direction = "NewPage"   //should this be something else ??
          self.startNum = 1  //should be able to use this to return to the correct page
          smugdata.getContent(node,self.pageSize,self.startNum).then(self.updateDisplay).catch(function(error) {
-              self.printDbgMessage(error)
+              self.printDbgMessage("[getNodeContent] " + error)
          })
-         self.printDbgMessage(self.direction)
+         self.printDbgMessage("[getNodeContent] direction : " + self.direction)
       },
       isMore : function() {
          return ((this.displayData.start + this.pageSize) < this.displayData.count)
@@ -366,23 +365,23 @@ var smugvue = new Vue({
       },
       containermore : function(direction) {
          this.direction = direction
-         this.printDbgMessage(direction)
+         this.printDbgMessage("[containermore] direction : " + direction)
          if (direction === 'PrevPage') {
             if ( this.isPrev() ) {
                this.startNum = this.displayData.start - this.pageSize
                if (this.startNum < 0) this.startNum = 1
-               this.printDbgMessage("Fetching Prev: Count: " + this.displayData.count + " Start: " + this.startNum)
+               this.printDbgMessage("[containermore] Fetching Prev: Count: " + this.displayData.count + " Start: " + this.startNum)
                smugdata.getContent(this.displayData.node,this.pageSize,this.startNum).then(this.updateDisplay).catch(function(error) {
-                  this.printDbgMessage(error)
+                  this.printDbgMessage("[containermore] " + error)
                })
             }
          }
          else if (direction === 'NextPage') {
             if ( this.isMore() ) {
                this.startNum = this.displayData.start + this.pageSize
-               this.printDbgMessage("Fetching More: Count: " + this.displayData.count + " Start: " + this.startNum)
+               this.printDbgMessage("[containermore] Fetching More: Count: " + this.displayData.count + " Start: " + this.startNum)
                smugdata.getContent(this.displayData.node,this.pageSize,this.startNum).then(this.updateDisplay).catch(function(error) {
-                  this.printDbgMessage(error)
+                  this.printDbgMessage("[containermore] " + error)
                })
             }
          }
@@ -519,16 +518,16 @@ var smugvue = new Vue({
         }
      },
      playpause : function() {
-        this.printDbgMessage("play/pause");
+        this.printDbgMessage("[playpause]");
 
         var vid = document.getElementById(this.videotagId)
         if (vid) {
            if (vid.paused) {
-              this.printDbgMessage("video.paused true, calling play()");
+              this.printDbgMessage("[playpause] video.paused true, calling play()");
               vid.play();
            }
            else {
-              this.printDbgMessage("video.paused false, calling pause()");
+              this.printDbgMessage("[playpause] video.paused false, calling pause()");
               vid.pause();
            }
         }
@@ -558,7 +557,7 @@ var smugvue = new Vue({
         }
      },
      openFullscreen : function(elem) {
-        this.printDbgMessage("openFullscreen")
+        this.printDbgMessage("[openFullscreen]")
         try {
            if (elem.requestFullscreen) {
                elem.requestFullscreen()
@@ -569,15 +568,15 @@ var smugvue = new Vue({
            } else if (elem.msRequestFullscreen) { /* IE/Edge */
                elem.msRequestFullscreen();
            } else {
-              this.printDbgMessage("Fullscreen not supported")
+              this.printDbgMessage("[openFullscreen] Fullscreen not supported")
            }
         } catch(err) {
-           this.printDbgMessage("request Fullscreen error: " + err)
+           this.printDbgMessage("[openFullscreen] request Fullscreen error: " + err)
         }
 
      },
      closeFullscreen : function() {
-        this.printDbgMessage("closeFullscreen")
+        this.printDbgMessage("[closeFullscreen]")
         if (document.exitFullscreen) {
            document.exitFullscreen();
         } else if (document.mozCancelFullScreen) { /* Firefox */
@@ -587,7 +586,7 @@ var smugvue = new Vue({
         } else if (document.msExitFullscreen) { /* IE/Edge */
            document.msExitFullscreen();
         } else {
-           this.printDbgMessage("Exit FullScreen not supported")
+           this.printDbgMessage("[closeFullscreen] Exit FullScreen not supported")
         }
      },
      mouseMove : function(event) {
@@ -596,8 +595,8 @@ var smugvue = new Vue({
         var moveX = event.movementX
         var moveY= event.movementY
         if (this.bmouseDebug) {
-            this.printDbgMessage("x,y: " + x + "," + y)
-            this.printDbgMessage("movex,movey: " + moveX + "," + moveY)
+            this.printDbgMessage("[mouseMove] x,y: " + x + "," + y)
+            this.printDbgMessage("[mouseMove] movex,movey: " + moveX + "," + moveY)
         }
      },
      itementer : function(item,index) {
@@ -637,7 +636,7 @@ var smugvue = new Vue({
      },
      keyDown : function(event) {
         var EKC = event.keyCode;
-        this.printDbgMessage("keyCode= " + EKC);
+        this.printDbgMessage("[keyDown] keyCode= " + EKC);
 
          /* The browser on the Samsung TV does not pass the arrow keys (or much else)
             through to the application.   It does pass the number keys, so use these keys

@@ -119,14 +119,27 @@ var smugvue = new Vue({
       var self = this
       this.setErrorFunction()
       document.addEventListener('keydown', this.keyDown, false)
-      //document.addEventListener('mousemove', this.mouseMove, false)
+      document.addEventListener('mousemove', this.mouseMove, false)
       this.processCommandline(document.URL)
      
       window.addEventListener("popstate", function(event) {
-          printDbgMessage("popstate event: ")
+          self.printDbgMessage("popstate event: ")
           state = event.state;
           if (state) {
-            printDbgMessage("Link Id: " + state["currlinkid"] + " Page Id: " + state["currpageid"])
+            self.printDbgMessage("[popstate] path: " + state.path + ": " + self.pathSize(state.path) 
+                                 + " name: " + state.name 
+                                 + " current path: " + self.displayData.path + ": " + self.pathSize(self.displayData.path)
+                                 + " History Size: " + window.history.length
+                                 + " History State: " + JSON.stringify(window.history.state))
+            if (self.pathSize(state.path) < self.pathSize(self.displayData.path)) {
+               // Back button, so simply go back
+               self.printDbgMessage("[popstate] Go Back")
+               self.goBack()
+            }
+            else {
+               // Forward Button, doesn't really make sense, so ignore
+               self.printDbgMessage("[popstate] Forward Button ignored")
+            }
           }
       },true)
 
@@ -194,9 +207,35 @@ var smugvue = new Vue({
             Vue.js reactivity system
              - this might be an issue on some TVs, what is the alternative??
          */
+         currPath = this.displayData.path
+         currNavNum = this.displayData.NavNum
+         newPath = data.path
+         newNavNum = data.NavNum
          this.displayData = Object.assign({}, data)
 
-         this.printDbgMessage("updateDisplay: Count: " + this.displayData.count + " Start: " + this.displayData.start)
+         
+         /* 
+            Can I add each new "page" display to the history?
+              - instead of having some index, can I use the path length?
+                - I can count the number of "directory levels", by spliting the path by the "/"
+              - we are also coming through here when retrieving "more" items from a large container
+
+         */
+         if (this.displayData.name){
+             document.title = this.displayData.name
+         }
+
+         this.printDbgMessage("[updateDisplay before pushState] History Size: " + window.history.length 
+            + " History State: " + JSON.stringify(window.history.state))
+
+         if (this.displayData.path != window.history.state.path) {
+            window.history.pushState({"path":this.displayData.path,"name":this.displayData.name},this.displayData.name)
+         }
+
+         this.printDbgMessage("[updateDisplay] Count: " + this.displayData.count + " Start: " + this.displayData.start 
+                               + " displayData.path: " + this.displayData.path)
+         this.printDbgMessage("[updateDisplay after pushState] History Size: " + window.history.length 
+                              + " History State: " + JSON.stringify(window.history.state))
 
          if (this.displayData.children) {
            this.calcImageSize(Math.floor(document.getElementById(this.screenId).getBoundingClientRect().width),
@@ -217,7 +256,7 @@ var smugvue = new Vue({
                       self.setbackgroundimage(self)
                    })
                    .catch(function(err) {
-                      self.printDbgMessage("Error getting backgroud images")
+                      self.printDbgMessage("Error getting background images")
                    })
                 }
             }
@@ -284,11 +323,7 @@ var smugvue = new Vue({
          if (item) {
             var self=this;
             if (item.type == "Container") {
-               self.direction = "NewPage"
-               self.startNum  = 1;
-               smugdata.getContent(item.node,self.pageSize,self.startNum).then(self.updateDisplay).catch(function(error) {
-                    self.printDbgMessage(error)
-               })
+               self.getNodeContent(item.node)
             }
             else {
                self.direction = "PlayMedia"
@@ -297,7 +332,7 @@ var smugvue = new Vue({
             self.printDbgMessage(self.direction)
          }
       },
-      containerParent : function(node) {
+      getNodeContent : function(node) {
          var self=this
          self.direction = "NewPage"   //should this be something else ??
          self.startNum = 1  //should be able to use this to return to the correct page
@@ -454,15 +489,15 @@ var smugvue = new Vue({
 
            /* Check if we need to scroll the container */
            if ((rect.bottom) > (contrect.bottom - (parseInt(eleStyle.marginBottom) + parseInt(eleStyle.borderWidth)))) {
-              this.printDbgMessage("Scroll Up: " + container.scrollTop);
+              //this.printDbgMessage("Scroll Up: " + container.scrollTop);
                container.scrollTop += rect.bottom - (contrect.bottom - (parseInt(eleStyle.marginBottom) + parseInt(eleStyle.borderWidth)));
               //container.scrollTop += rect.height;
-              this.printDbgMessage("Scroll Top: " + container.scrollTop);
+              //this.printDbgMessage("Scroll Top: " + container.scrollTop);
            }
            else if (rect.top < (contrect.top+parseInt(eleStyle.marginTop))) {
-              this.printDbgMessage("Scroll Down: " + container.scrollTop);
+              //this.printDbgMessage("Scroll Down: " + container.scrollTop);
               container.scrollTop -= (contrect.top+parseInt(eleStyle.marginTop)) - rect.top;
-              this.printDbgMessage("Scroll Top: " + container.scrollTop);
+              //this.printDbgMessage("Scroll Top: " + container.scrollTop);
            }
         }
      },
@@ -547,9 +582,39 @@ var smugvue = new Vue({
         this.printDbgMessage("movex,movey: " + moveX + "," + moveY)
      },
      itementer : function(item,index) {
-        this.printDbgMessage("itementer: index = " + index)
+        //this.printDbgMessage("itementer: index = " + index)
         this.currentItem = index
         this.scroll(this.anchors[this.currentItem].parentNode,document.getElementById(this.contentareaId))
+     },
+     pathSize : function(path) {
+        size = 0
+        if (path) {
+           for (entry of path.split('/')) {
+              if (entry.length > 0) {
+                 size++
+              }
+           }
+        }
+        return(size)
+     },
+     goBack : function() {
+         if (this.mediaPlayerData === undefined) {
+            if (this.displayData.parent) {
+               /* container that is not root, move to the previous container
+                  - ToDo: keep some additional context about each data node
+                     so that we can go back to the select item
+                     - For example if I select item 15 in a container and that opens
+                     another container, when I go back to the original container item
+                     15 should be selected.
+               */
+               this.getNodeContent(this.displayData.parent)
+            }
+         }
+         else {
+            /* must be a media item */
+            this.mediaended()
+            this.scroll(this.anchors[this.currentItem].parentNode,document.getElementById(this.contentareaId))
+         }
      },
      keyDown : function(event) {
         var EKC = event.keyCode;
@@ -571,23 +636,7 @@ var smugvue = new Vue({
 
            case 55:      /* 7 digit */
            case 8:       /* Xfinity Last Key / Keyboard backspace key */
-              if (this.mediaPlayerData === undefined) {
-                 if (this.displayData.parent) {
-                    /* container that is not root, move to the previous container
-                        - ToDo: keep some additional context about each data node
-                          so that we can go back to the select item
-                          - For example if I select item 15 in a container and that opens
-                            another container, when I go back to the original container item
-                            15 should be selected.
-                    */
-                    this.containerParent(this.displayData.parent)
-                 }
-              }
-              else {
-                 /* must be a media item */
-                 this.mediaended()
-                 this.scroll(this.anchors[this.currentItem].parentNode,document.getElementById(this.contentareaId))
-              }
+              this.goBack()
               bHandled = true;
            break;
 

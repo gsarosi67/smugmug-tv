@@ -7,7 +7,8 @@ Vue.component('info-tree', {
 var smugvue = new Vue({
    el: '#smugvue',
    data : {
-      version : "1.10.6",
+      version : "1.11.1",
+      mousemove_key_theshold : 0,
       displayData : {username: "sarosi", path: "/"},
       mediaPlayerData : undefined,
       logScreen : {
@@ -310,6 +311,9 @@ var smugvue = new Vue({
                   else if (params[i].substring(equal) == "false") {
                      this.bmouseDebug = false
                   }
+               }
+               else if (params[i].substring(0,equal) == "mmkt") {
+                  this.mousemove_key_theshold = parseInt(params[i].substring(equal))
                }
      		   }
      	   }
@@ -620,6 +624,17 @@ var smugvue = new Vue({
             this.printDbgMessage("[mouseMove] x,y: " + x + "," + y)
             this.printDbgMessage("[mouseMove] movex,movey: " + moveX + "," + moveY)
         }
+        if ((this.mediaPlayerData != undefined) && (this.isVideo(this.mediaPlayerData.format))) {
+           // Only use mouse movement for the right and left keys when playing video
+           // This is mainly for TVs that have remotes with limted keys (no arrows or trick play keys)
+           // Doing this generically doesn't work well 
+            if (moveY == 0 && moveX > 0 && moveX < this.mousemove_key_theshold) {
+                  this.simulateKeyPress("ArrowRight",39)
+            }
+            else if (moveY == 0 && moveX < 0 && moveX > -this.mousemove_key_theshold) {
+                  this.simulateKeyPress("ArrowLeft",37)
+            }
+        }
      },
      itementer : function(item,index) {
         //this.printDbgMessage("itementer: index = " + index)
@@ -656,9 +671,26 @@ var smugvue = new Vue({
             this.scroll(this.anchors[this.currentItem].parentNode,document.getElementById(this.contentareaId))
          }
      },
+     simulateKeyPress : function (key,keyCode) {
+         const event = new KeyboardEvent('keydown', {
+         key: key,
+         code: key,
+         keyCode: keyCode,
+         which: keyCode,
+         bubbles: true,
+         cancelable: true,
+        });
+    
+        document.dispatchEvent(event);
+     },
      keyDown : function(event) {
         var EKC = event.keyCode;
-        this.printDbgMessage("[keyDown] keyCode= " + EKC);
+        this.printDbgMessage("[keyDown] event.keyCode:    " + event.keyCode)
+        this.printDbgMessage("[keyDown] event.code:       " + event.code)
+        this.printDbgMessage("[keyDown] event.key:        " + event.key)
+        this.printDbgMessage("[keyDown] event.which:      " + event.which)
+        this.printDbgMessage("[keyDown] event.bubbles:    " + event.bubbles)
+        this.printDbgMessage("[keyDown] event.cancelable: " + event.cancelable + "\n")
 
          /* The browser on the Samsung TV does not pass the arrow keys (or much else)
             through to the application.   It does pass the number keys, so use these keys
@@ -731,71 +763,83 @@ var smugvue = new Vue({
            case 37: /* Left arrow */
            case 50: /* 2 digit (up) */
            case 38: /* Up arrow */
-                 var newItem;
-                 if (EKC == 37 || EKC == 52) {
-                    newItem = this.currentItem - 1;   /* 4 digit or left */
-                 }
-                 else {
-                    newItem = this.currentItem - this.rowsize;
-                 }
+                  if ((EKC == 37 || EKC == 52) && (this.mediaPlayerData != undefined) && (this.isVideo(this.mediaPlayerData.format))) {
+                     // Playing video so left arrow is FF
+                     this.rewind()
+                  }
+                  else {
+                     var newItem;
+                     if (EKC == 37 || EKC == 52) {
+                        newItem = this.currentItem - 1;   /* 4 digit or left */
+                     }
+                     else {
+                        newItem = this.currentItem - this.rowsize;
+                     }
 
-                 if (newItem < 0) {
-                    if ( this.isPrev() ) {
-                       this.containermore("PrevPage")
-                    }
-                    else {
-                       this.currentItem = 0
-                    }
-                 }
-                 else {
-                    this.currentItem = newItem
-                    if (this.mediaPlayerData === undefined) {
-                       /* scroll */
-                       var self=this
-                       self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
-                    } else {
-                       this.itemaction(this.displayData.children[this.currentItem])
-                    }
-                 }
-                 bHandled = true;
+                     if (newItem < 0) {
+                        if ( this.isPrev() ) {
+                           this.containermore("PrevPage")
+                        }
+                        else {
+                           this.currentItem = 0
+                        }
+                     }
+                     else {
+                        this.currentItem = newItem
+                        if (this.mediaPlayerData === undefined) {
+                           /* scroll */
+                           var self=this
+                           self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+                        } else {
+                           this.itemaction(this.displayData.children[this.currentItem])
+                        }
+                     }
+                  }
+                  bHandled = true;
              break;
 
              case 54: /* 6 digit (right) */
              case 39: /* Right arrow */
              case 56: /* 8 digit (down) */
              case 40: /* Down arrow */
-                var newItem;
-                if (EKC == 39 || EKC == 54) {
-                   newItem = this.currentItem+1;      /* 6 digit or right */
-                }
-                else {
-                   newItem = this.currentItem + this.rowsize;  /* 8 digit or down */
-                }
+                  if ((EKC == 39 || EKC == 54) && (this.mediaPlayerData != undefined) && (this.isVideo(this.mediaPlayerData.format))) {
+                     // Playing video so left arrow is FF
+                     this.fastforward()
+                  }
+                  else {
+                     var newItem;
+                     if (EKC == 39 || EKC == 54) {
+                        newItem = this.currentItem+1;      /* 6 digit or right */
+                     }
+                     else {
+                        newItem = this.currentItem + this.rowsize;  /* 8 digit or down */
+                     }
 
-                if (newItem >= this.anchors.length) {
-                   /*
-                      At this point we have reached the end of the current list of anchors so
-                      check to see if there are more and if there are, set the state to
-                      get the next page of content and redraw. */
-                   if ( this.isMore() ) {
-                      this.containermore('NextPage')
-                   }
-                   else {
-                      /* no more items make sure currentItem is at the end of the list */
-                      this.currentItem = this.anchors.length - 1
-                   }
-                }
-                else {
-                   this.currentItem = newItem;
-                   if (this.mediaPlayerData === undefined) {
-                      /* scroll */
-                      var self=this
-                      self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
-                   } else {
-                      this.itemaction(this.displayData.children[this.currentItem])
-                   }
-                }
-                bHandled = true;
+                     if (newItem >= this.anchors.length) {
+                        /*
+                           At this point we have reached the end of the current list of anchors so
+                           check to see if there are more and if there are, set the state to
+                           get the next page of content and redraw. */
+                        if ( this.isMore() ) {
+                           this.containermore('NextPage')
+                        }
+                        else {
+                           /* no more items make sure currentItem is at the end of the list */
+                           this.currentItem = this.anchors.length - 1
+                        }
+                     }
+                     else {
+                        this.currentItem = newItem;
+                        if (this.mediaPlayerData === undefined) {
+                           /* scroll */
+                           var self=this
+                           self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+                        } else {
+                           this.itemaction(this.displayData.children[this.currentItem])
+                        }
+                     }
+                  }
+                  bHandled = true;
              break;
 
              case 51: /* 3 digit */

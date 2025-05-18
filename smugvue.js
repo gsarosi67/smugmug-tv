@@ -8,7 +8,7 @@ var smugvue = new Vue({
    el: '#smugvue',
    data : {
       appName : "SmugVue",
-      version : "1.11.27",
+      version : "1.11.29",
       mousemove_key_theshold : 0,
       displayData : {username: "sarosi", path: "/"},
       mediaPlayerData : undefined,
@@ -21,6 +21,7 @@ var smugvue = new Vue({
       spinner : undefined,
       bDebug : false,
       bmouseDebug : false,
+      bmouseMove : false,
       pageSize : 50,
       startNum : 1,
       rowsize : 0,   /* number of items in one row, calculated at the end of the rendering */
@@ -657,6 +658,7 @@ var smugvue = new Vue({
         var y = event.clientY
         var moveX = event.movementX
         var moveY= event.movementY
+        this.bmouseMove = true
         if (this.bmouseDebug) {
             this.printDbgMessage("[mouseMove] x,y: " + x + "," + y)
             this.printDbgMessage("[mouseMove] movex,movey: " + moveX + "," + moveY)
@@ -676,7 +678,10 @@ var smugvue = new Vue({
      itementer : function(item,index) {
         //this.printDbgMessage("itementer: index = " + index)
         this.currentItem = index
-        this.scroll(this.anchors[this.currentItem].parentNode,document.getElementById(this.contentareaId))
+        if (this.bmouseMove) {
+            this.bmouseMove = false
+            this.scroll(this.anchors[this.currentItem].parentNode,document.getElementById(this.contentareaId))
+        }
      },
      pathSize : function(path) {
         size = 0

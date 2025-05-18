@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html>
    <head>
-      <!-- development version, includes helpful console warnings -->
-      <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
-      <!-- production version, optimized for size and speed
-      <script src="https://cdn.jsdelivr.net/npm/vue"></script> -->
+      <!-- development version, includes helpful console warnings
+      <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script> -->
+      <!-- production version, optimized for size and speed -->
+      <script src="https://cdn.jsdelivr.net/npm/vue@2.7.16"></script> 
       <script src='https://cdn.rawgit.com/github/fetch/v0.9.0/fetch.js'></script>
       <script src="https://cdn.jsdelivr.net/npm/lodash@4.13.1/lodash.min.js"></script>
       <script type='text/javascript' src='smugdata.js?ver=4'></script>
 
-      <link rel="stylesheet" href="smugvue.css?ver=1.10.3">
+      <link rel="stylesheet" href="smugvue.css?ver=1.11.27">
    </head>
 
    <body>
@@ -18,20 +18,20 @@
 
          <template v-if="mediaPlayerData === undefined">
             <div id='header' class='header'>
-               <div id='appname' class="appname">SmugMug for TV</div>
+               <div id='appname' class="appname">{{ appName }}</div>
                <div id='appversion' class="appversion">{{ version }}</div>
                <div id='user' class="user" v-bind:style="usernameStyle()">{{ username.toUpperCase() }}</div>
                <div id='path' class="path">{{ displayData.path }}</div>
             </div>
 
             <div id='topinfo'  class='infoarea topinfo'>
-               <template v-if='isPrev()'>
+               <template v-if='showPrevButton()'>
                   <input id="topmorebutton" class="morebutton" type="button" v-on:click="containermore('PrevPage')" value="Show Previous...">
                </template>
             </div>
 
             <div id='bottominfo'  class='infoarea bottominfo'>
-               <template v-if='isMore()'>
+               <template v-if='showMoreButton()'>
                   <input id="bottommorebutton" class="morebutton" type="button" v-on:click="containermore('NextPage')" value="Show More...">
                </template>
             </div>
@@ -47,7 +47,7 @@
                         </div>
                         <template v-if="isVideo(child.format)">
                            <div class="videoicon">
-                              <img src="video_icon.png">
+                              <img src="assets/video_icon.png">
                            </div>
                         </template>
                         <div class="contentlabel">
@@ -60,8 +60,10 @@
             
 
          <template v-if="mediaPlayerData !== undefined && isImage(mediaPlayerData.format)">
-           <div id="imageplayerdiv" class="player" v-on:click="mediaended()">
+           <div id="imageplayerdiv" class="player">
               <img id="image" class="playerimg" v-bind:src="displayImageUrl()"></img>
+              <img id="rtarrow" class="rtarrow" src="assets/rt_arrow.png" v-on:click="simulateKeyPress('ArrowRight',39)"></img>
+              <img id="ltarrow" class="ltarrow" src="assets/lt_arrow.png" v-on:click="simulateKeyPress('ArrowLeft',37)">></img>
            </div>
          </template>
          <template v-else-if="mediaPlayerData !== undefined && isVideo(mediaPlayerData.format)">
@@ -107,5 +109,5 @@
           <li class='infoentry'>No data available</li>
        </ul>
    </script>
-   <script type='text/javascript' src='smugvue.js?ver=1.10.6'></script>
+   <script type='text/javascript' src='smugvue.js?ver=1.11.27'></script>
 </html>

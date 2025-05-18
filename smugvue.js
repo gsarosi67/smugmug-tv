@@ -7,7 +7,9 @@ Vue.component('info-tree', {
 var smugvue = new Vue({
    el: '#smugvue',
    data : {
-      version : "1.10.6",
+      appName : "SmugVue",
+      version : "1.11.27",
+      mousemove_key_theshold : 0,
       displayData : {username: "sarosi", path: "/"},
       mediaPlayerData : undefined,
       logScreen : {
@@ -30,8 +32,8 @@ var smugvue = new Vue({
          'cmac',
          'accionfotos'
       ],
-      defaultImageWidth : 233,
-      defaultImageHeight : 170,
+      defaultImageWidth : 296,
+      defaultImageHeight : 216,
       imageMargin : 1,
       imageborderWidth : 5,
       imagePadding : 0,
@@ -119,20 +121,25 @@ var smugvue = new Vue({
    },
    created: function() {
       var self = this
-      this.setErrorFunction()
-      document.addEventListener('keydown', this.keyDown, false)
-      document.addEventListener('mousemove', this.mouseMove, false)
-      this.processCommandline(document.URL)
+      self.setErrorFunction()
+      document.addEventListener('keydown', self.keyDown, false)
+      document.addEventListener('mousemove', self.mouseMove, false)
+      self.processCommandline(document.URL)
+
+      document.title = self.appName + " v" + self.version
+      self.printDbgMessage("[created] **** Document Title: " + document.title + "****")
      
       window.addEventListener("popstate", function(event) {
-          self.printDbgMessage("[popstate] event: ")
+          //self.printDbgMessage("[popstate] event: ")
           state = event.state;
           if (state) {
+            /*
             self.printDbgMessage("[popstate] path: " + state.path + ": " + self.pathSize(state.path) 
                                  + " name: " + state.name 
                                  + " current path: " + self.displayData.path + ": " + self.pathSize(self.displayData.path)
                                  + " History Size: " + window.history.length
                                  + " History State: " + JSON.stringify(window.history.state))
+            */
             if (self.pathSize(state.path) < self.pathSize(self.displayData.path)) {
                // Back button, so simply go back
                self.printDbgMessage("[popstate] Go Back")
@@ -146,7 +153,7 @@ var smugvue = new Vue({
       },true)
 
       self.printDbgMessage("[created] Screen Size: Width: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().width) + ", Height: " + Math.floor(document.getElementById(self.screenId).getBoundingClientRect().height))
-      this.initData(smugdata)
+      self.initData(smugdata)
 
       // I think I only need to set this once and it will update...
       self.anchors = document.getElementsByTagName("a")
@@ -221,10 +228,11 @@ var smugvue = new Vue({
                 - I can count the number of "directory levels", by spliting the path by the "/"
               - we are also coming through here when retrieving "more" items from a large container
 
-         */
+         // I think the document title should stay static
          if (this.displayData.name){
              document.title = this.displayData.name
          }
+         */
          this.printDbgMessage("[updateDisplay] Count: " + this.displayData.count + " Start: " + this.displayData.start 
             + " displayData.path: " + this.displayData.path)
 
@@ -291,7 +299,7 @@ var smugvue = new Vue({
                   if (params[i].substring(equal+1) == "true") {
                      bProxy = true
                   }
-                  else if (params[i].substring(equal) == "false") {
+                  else if (params[i].substring(equal+1) == "false") {
                      bProxy = false
                   }
                }
@@ -299,7 +307,7 @@ var smugvue = new Vue({
                   if (params[i].substring(equal+1) == "true") {
                      this.bDebug = true
                   }
-                  else if (params[i].substring(equal) == "false") {
+                  else if (params[i].substring(equal+1) == "false") {
                      this.bDebug = false
                   }
                }
@@ -307,9 +315,18 @@ var smugvue = new Vue({
                   if (params[i].substring(equal+1) == "true") {
                      this.bmouseDebug = true
                   }
-                  else if (params[i].substring(equal) == "false") {
+                  else if (params[i].substring(equal+1) == "false") {
                      this.bmouseDebug = false
                   }
+               }
+               else if (params[i].substring(0,equal) == "mmkt") {
+                  this.mousemove_key_theshold = parseInt(params[i].substring(equal+1))
+               }
+               else if (params[i].substring(0,equal) == "defimgw") {
+                  this.defaultImageWidth = parseInt(params[i].substring(equal+1))
+               }
+               else if (params[i].substring(0,equal) == "defimgh") {
+                  this.defaultImageHeight = parseInt(params[i].substring(equal+1))
                }
      		   }
      	   }
@@ -346,23 +363,35 @@ var smugvue = new Vue({
                self.getNodeContent(item.node)
             }
             else {
-               self.direction = "PlayMedia"
+               if (self.direction == "PlayMedia") {
+                  // Player is already active and we are loading a new file
+                  // need to remove the current filename for the end of the path so it is 
+                  // replaced below
+                  this.displayData.path = this.displayData.path.substring(0,this.displayData.path.lastIndexOf("/"))
+                  this.displayData.name = this.displayData.name.substring(0,this.displayData.name.lastIndexOf("/"))
+                  self.displayData.path += "/" + item.path
+                  self.displayData.name += "/" + item.name
 
-               // Need to add the media file name to the path and to the window history so that 
-               // the back button pop event works correctly
-               self.displayData.path += "/" + item.path
-               self.displayData.name += "/" + item.name
-               if (self.displayData.name){
-                  document.title = self.displayData.name
-               }
-     
-               self.printDbgMessage("[itemaction before pushState] History Size: " + window.history.length 
-                 + " History State: " + JSON.stringify(window.history.state))
-     
-               if ((window.history.state == null) || (self.displayData.path != window.history.state.path)) {
-                  window.history.pushState({"path":self.displayData.path,"name":self.displayData.name},self.displayData.name)
-                  self.printDbgMessage("[itemaction after pushState] History Size: " + window.history.length 
-                                       + " History State: " + JSON.stringify(window.history.state))
+                  // I think that I don't want to add each media item to the window history, this way that back button
+                  // we exit from "PlayMedia" mode....
+
+               } else {
+                  self.direction = "PlayMedia"
+               
+                  // Need to add the media file name to the path and to the window history so that 
+                  // the back button pop event works correctly
+                  self.displayData.path += "/" + item.path
+                  self.displayData.name += "/" + item.name
+                  
+      
+                  self.printDbgMessage("[itemaction before pushState] History Size: " + window.history.length 
+                  + " History State: " + JSON.stringify(window.history.state))
+      
+                  if ((window.history.state == null) || (self.displayData.path != window.history.state.path)) {
+                     window.history.pushState({"path":self.displayData.path,"name":self.displayData.name},self.displayData.name)
+                     self.printDbgMessage("[itemaction after pushState] History Size: " + window.history.length 
+                                          + " History State: " + JSON.stringify(window.history.state))
+                  }
                }
                //This triggers the playback the media player is hidden until it is assigned an item to play
                self.mediaPlayerData = item
@@ -378,6 +407,16 @@ var smugvue = new Vue({
               self.printDbgMessage("[getNodeContent] " + error)
          })
          self.printDbgMessage("[getNodeContent] direction : " + self.direction)
+      },
+      showMoreButton() {
+         // Show the more button if there are more items to fetch
+         // and the current selection is in the last row of the page
+         return (this.isMore() && this.currentItem >= (this.pageSize - this.rowsize))
+      },
+      showPrevButton() {
+         // Show the previous button if there are previous items to fetch
+         // and the current selection is in the first row of the page
+         return (this.isPrev() && this.currentItem < this.rowsize)
       },
       isMore : function() {
          return ((this.displayData.start + this.pageSize) < this.displayData.count)
@@ -528,13 +567,15 @@ var smugvue = new Vue({
            /* Check if we need to scroll the container */
            if ((rect.bottom) > (contrect.bottom - (parseInt(eleStyle.marginBottom) + parseInt(eleStyle.borderWidth)))) {
               //this.printDbgMessage("Scroll Up: " + container.scrollTop);
-               container.scrollTop += rect.bottom - (contrect.bottom - (parseInt(eleStyle.marginBottom) + parseInt(eleStyle.borderWidth)));
-              //container.scrollTop += rect.height;
+               //container.scrollTop += rect.bottom - (contrect.bottom - (parseInt(eleStyle.marginBottom) + parseInt(eleStyle.borderWidth)));
+               // Want to make sure the next row can be seen so that you can mouse over it 
+               container.scrollTop += rect.bottom - (contrect.bottom - (parseInt(eleStyle.marginBottom) + parseInt(eleStyle.borderWidth) + (rect.height/4)));
+               //container.scrollTop += rect.height;
               //this.printDbgMessage("Scroll Top: " + container.scrollTop);
            }
            else if (rect.top < (contrect.top+parseInt(eleStyle.marginTop))) {
               //this.printDbgMessage("Scroll Down: " + container.scrollTop);
-              container.scrollTop -= (contrect.top+parseInt(eleStyle.marginTop)) - rect.top;
+              container.scrollTop -= (contrect.top+parseInt(eleStyle.marginTop)) - (rect.top - (rect.height/4));
               //this.printDbgMessage("Scroll Top: " + container.scrollTop);
            }
         }
@@ -620,6 +661,17 @@ var smugvue = new Vue({
             this.printDbgMessage("[mouseMove] x,y: " + x + "," + y)
             this.printDbgMessage("[mouseMove] movex,movey: " + moveX + "," + moveY)
         }
+        if ((this.mediaPlayerData != undefined) && (this.isVideo(this.mediaPlayerData.format))) {
+           // Only use mouse movement for the right and left keys when playing video
+           // This is mainly for TVs that have remotes with limted keys (no arrows or trick play keys)
+           // Doing this generically doesn't work well 
+            if (moveY == 0 && moveX > 0 && moveX < this.mousemove_key_theshold) {
+                  this.simulateKeyPress("ArrowRight",39)
+            }
+            else if (moveY == 0 && moveX < 0 && moveX > -this.mousemove_key_theshold) {
+                  this.simulateKeyPress("ArrowLeft",37)
+            }
+        }
      },
      itementer : function(item,index) {
         //this.printDbgMessage("itementer: index = " + index)
@@ -656,9 +708,28 @@ var smugvue = new Vue({
             this.scroll(this.anchors[this.currentItem].parentNode,document.getElementById(this.contentareaId))
          }
      },
+     simulateKeyPress : function (key,keyCode) {
+         const event = new KeyboardEvent('keydown', {
+         key: key,
+         code: key,
+         keyCode: keyCode,
+         which: keyCode,
+         bubbles: true,
+         cancelable: true,
+        });
+    
+        document.dispatchEvent(event);
+     },
      keyDown : function(event) {
         var EKC = event.keyCode;
-        this.printDbgMessage("[keyDown] keyCode= " + EKC);
+        /*
+        this.printDbgMessage("[keyDown] event.keyCode:    " + event.keyCode)
+        this.printDbgMessage("[keyDown] event.code:       " + event.code)
+        this.printDbgMessage("[keyDown] event.key:        " + event.key)
+        this.printDbgMessage("[keyDown] event.which:      " + event.which)
+        this.printDbgMessage("[keyDown] event.bubbles:    " + event.bubbles)
+        this.printDbgMessage("[keyDown] event.cancelable: " + event.cancelable + "\n")
+        */
 
          /* The browser on the Samsung TV does not pass the arrow keys (or much else)
             through to the application.   It does pass the number keys, so use these keys
@@ -731,71 +802,83 @@ var smugvue = new Vue({
            case 37: /* Left arrow */
            case 50: /* 2 digit (up) */
            case 38: /* Up arrow */
-                 var newItem;
-                 if (EKC == 37 || EKC == 52) {
-                    newItem = this.currentItem - 1;   /* 4 digit or left */
-                 }
-                 else {
-                    newItem = this.currentItem - this.rowsize;
-                 }
+                  if ((EKC == 37 || EKC == 52) && (this.mediaPlayerData != undefined) && (this.isVideo(this.mediaPlayerData.format))) {
+                     // Playing video so left arrow is FF
+                     this.rewind()
+                  }
+                  else {
+                     var newItem;
+                     if (EKC == 37 || EKC == 52) {
+                        newItem = this.currentItem - 1;   /* 4 digit or left */
+                     }
+                     else {
+                        newItem = this.currentItem - this.rowsize;
+                     }
 
-                 if (newItem < 0) {
-                    if ( this.isPrev() ) {
-                       this.containermore("PrevPage")
-                    }
-                    else {
-                       this.currentItem = 0
-                    }
-                 }
-                 else {
-                    this.currentItem = newItem
-                    if (this.mediaPlayerData === undefined) {
-                       /* scroll */
-                       var self=this
-                       self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
-                    } else {
-                       this.itemaction(this.displayData.children[this.currentItem])
-                    }
-                 }
-                 bHandled = true;
+                     if (newItem < 0) {
+                        if ( this.isPrev() ) {
+                           this.containermore("PrevPage")
+                        }
+                        else {
+                           this.currentItem = 0
+                        }
+                     }
+                     else {
+                        this.currentItem = newItem
+                        if (this.mediaPlayerData === undefined) {
+                           /* scroll */
+                           var self=this
+                           self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+                        } else {
+                           this.itemaction(this.displayData.children[this.currentItem])
+                        }
+                     }
+                  }
+                  bHandled = true;
              break;
 
              case 54: /* 6 digit (right) */
              case 39: /* Right arrow */
              case 56: /* 8 digit (down) */
              case 40: /* Down arrow */
-                var newItem;
-                if (EKC == 39 || EKC == 54) {
-                   newItem = this.currentItem+1;      /* 6 digit or right */
-                }
-                else {
-                   newItem = this.currentItem + this.rowsize;  /* 8 digit or down */
-                }
+                  if ((EKC == 39 || EKC == 54) && (this.mediaPlayerData != undefined) && (this.isVideo(this.mediaPlayerData.format))) {
+                     // Playing video so left arrow is FF
+                     this.fastforward()
+                  }
+                  else {
+                     var newItem;
+                     if (EKC == 39 || EKC == 54) {
+                        newItem = this.currentItem+1;      /* 6 digit or right */
+                     }
+                     else {
+                        newItem = this.currentItem + this.rowsize;  /* 8 digit or down */
+                     }
 
-                if (newItem >= this.anchors.length) {
-                   /*
-                      At this point we have reached the end of the current list of anchors so
-                      check to see if there are more and if there are, set the state to
-                      get the next page of content and redraw. */
-                   if ( this.isMore() ) {
-                      this.containermore('NextPage')
-                   }
-                   else {
-                      /* no more items make sure currentItem is at the end of the list */
-                      this.currentItem = this.anchors.length - 1
-                   }
-                }
-                else {
-                   this.currentItem = newItem;
-                   if (this.mediaPlayerData === undefined) {
-                      /* scroll */
-                      var self=this
-                      self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
-                   } else {
-                      this.itemaction(this.displayData.children[this.currentItem])
-                   }
-                }
-                bHandled = true;
+                     if (newItem >= this.anchors.length) {
+                        /*
+                           At this point we have reached the end of the current list of anchors so
+                           check to see if there are more and if there are, set the state to
+                           get the next page of content and redraw. */
+                        if ( this.isMore() ) {
+                           this.containermore('NextPage')
+                        }
+                        else {
+                           /* no more items make sure currentItem is at the end of the list */
+                           this.currentItem = this.anchors.length - 1
+                        }
+                     }
+                     else {
+                        this.currentItem = newItem;
+                        if (this.mediaPlayerData === undefined) {
+                           /* scroll */
+                           var self=this
+                           self.scroll(self.anchors[self.currentItem].parentNode,document.getElementById(self.contentareaId))
+                        } else {
+                           this.itemaction(this.displayData.children[this.currentItem])
+                        }
+                     }
+                  }
+                  bHandled = true;
              break;
 
              case 51: /* 3 digit */
@@ -840,6 +923,7 @@ var smugvue = new Vue({
              case 68:  /* 'D' key on keyboard */
              break;
           }
+          //this.printDbgMessage("[keyDown] currentItem: " + this.currentItem)
           if (bHandled && event.preventDefault) {
             //printDbgMessage("preventDefault");
             event.preventDefault();

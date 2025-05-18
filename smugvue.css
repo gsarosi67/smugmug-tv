@@ -49,7 +49,7 @@ body {
   /* color: rgb(30,30,30); */
   /* border-radius: 10px; */
   font-family: Century Gothic, sans-serif;
-  font-size: 24px;
+  font-size: 32px;
 
   /* visibility: hidden; */
 }
@@ -75,7 +75,7 @@ body {
    top: 15%;
    /* right: 46%; */
    left: 0;
-   font-size: 22px;
+   font-size: 32px;
 }
 
 .userlist {
@@ -99,17 +99,17 @@ body {
 }
 
 .bottominfo {
-   top: 97%;
+   top: 96%;
 }
 
 .infoarea {
    position: absolute;
    left: 0;
    width: 100%;
-   height: 3%;
+   height: 4%;
    background-color: black;
    color: white;
-   font-size: 14px;
+   font-size: 18px;
    z-index: 200;
 }
 
@@ -118,7 +118,8 @@ body {
    top: 2%;
    text-align: center;
    width: 100%;
-   font-size: 18px;
+   height: 100%;
+   font-size: 24px;
 	border-style: none;
    color: rgb(1, 10, 12);
    z-index: 201;
@@ -129,10 +130,10 @@ body {
 
 .content {
 	position: absolute;
-   top: 12%;
+   top: 13%;
    left: 0;
 	width: 100%;
-	height: 85%;
+	height: 83%;
 	z-index: 20;
 	background-color: black;
 	color: white;
@@ -198,12 +199,43 @@ body {
 
 	z-index: 110;
    box-sizing: border-box;
+
+   background-color: rgba(50, 50, 50, 0.8);
 }
 
 .playerimg {
    object-fit: contain;
    width: 100%;
    height: 100%;
+}
+
+.rtarrow {
+   z-index: 120;
+   position: absolute;
+   top: 25%;
+   left: 78%;
+   width: 20%;
+   height: 50%;
+   opacity: 0.0
+}
+
+.ltarrow {
+   z-index: 120;
+   position: absolute;
+   top: 25%;
+   left: 1%;
+   width: 20%;
+   height: 50%;
+   opacity: 0.0
+}
+
+
+.rtarrow:hover {
+   opacity: 0.4
+}
+
+.ltarrow:hover {
+   opacity: 0.4
 }
 
 .player.active {

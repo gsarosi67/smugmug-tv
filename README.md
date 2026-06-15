@@ -11,3 +11,8 @@
 * Rewrite the UI using vue.js and/or React or anything else
 * implement a websocket connection that allows for remote navigation using a phone, this will help with the Samsung TV that only support mouse navigation
 * 
+
+Usage:
+
+npm run dev — starts webpack-dev-server on port 8080 with live reload
+npm run build — production build to dist/

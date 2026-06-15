@@ -87,6 +87,7 @@ var smugdata = {
   displayData : undefined,
   userData : undefined,
   pageSize : 100,
+  smugmugapi : "",
 
   /* Proxy Configuration
      Used for IPv6 to IPv4 proxy */
@@ -99,6 +100,23 @@ var smugdata = {
         pathname: ""
      }
   ],
+  /*
+  getRequestToken : function(logger) {
+        
+           Fetch the request token for OAuth login
+       
+      if (logger) {
+          smugdata.debugLog = logger;
+       }
+
+       return (new Promise(function(resolve, reject) {
+          smugdata.smugmugapi = smugdata.smugmugProtocol + 
+                                smugdata.smug_api + smugdata.apiVerbosity + 
+                                "&api=services/oauth/1.0a/getRequestToken";
+       }
+
+  },
+  */
   getUserNode: function(username, logger) {
        /*
            Fetch the user and the root node

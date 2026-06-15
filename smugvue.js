@@ -8,7 +8,7 @@ var smugvue = new Vue({
    el: '#smugvue',
    data : {
       appName : "SmugVue",
-      version : "1.11.29",
+      version : "1.11.31",
       mousemove_key_theshold : 0,
       displayData : {username: "sarosi", path: "/"},
       mediaPlayerData : undefined,
